@@ -5,24 +5,24 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/Memonagi/wallet_project/internal/database"
+	"github.com/Memonagi/wallet_project/internal/handlers"
+	"github.com/sirupsen/logrus"
 )
 
-const dbFile = "wallet.db"
+const port = 8080
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.New(ctx, dbFile)
-	if err != nil {
-		logrus.Panicf("failed to connect to database: %w", err)
+	if _, err := database.New(ctx); err != nil {
+		logrus.Panicf("failed to connect to database: %v", err)
 	}
-	defer func() {
-		if err := db.CloseDB(); err != nil {
-			logrus.Panicf("failed to close database: %w", err)
-		}
-	}()
+
+	server := handlers.New(port)
+
+	if err := server.Run(ctx); err != nil {
+		logrus.Panicf("failed to start server: %v", err)
+	}
 }
