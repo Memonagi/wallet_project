@@ -16,8 +16,13 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	if _, err := database.New(ctx); err != nil {
+	db, err := database.New(ctx)
+	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
+	}
+
+	if err := db.MigrateUsers(ctx); err != nil {
+		logrus.Panicf("failed to migrate users: %v", err)
 	}
 
 	server := handlers.New(port)
