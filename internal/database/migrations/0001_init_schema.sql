@@ -1,0 +1,9 @@
+-- +migrate Up
+
+CREATE TABLE users (
+    user_id UUID NOT NULL UNIQUE PRIMARY KEY,
+    status VARCHAR(128) NOT NULL,
+    archived BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
