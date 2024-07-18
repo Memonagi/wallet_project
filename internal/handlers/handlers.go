@@ -16,6 +16,11 @@ type Handler struct {
 	port   int
 }
 
+const (
+	readHeaderTimeout = 5 * time.Second
+	gracefulTimeout   = 10 * time.Second
+)
+
 func New(port int) *Handler {
 	r := chi.NewRouter()
 
@@ -24,7 +29,7 @@ func New(port int) *Handler {
 		server: http.Server{
 			Addr:              fmt.Sprintf(":%d", port),
 			Handler:           r,
-			ReadHeaderTimeout: 5 * time.Second,
+			ReadHeaderTimeout: readHeaderTimeout,
 		},
 		port: port,
 	}
@@ -40,7 +45,7 @@ func (h *Handler) Run(ctx context.Context) error {
 		<-ctx.Done()
 		logrus.Info("shutting down server")
 
-		gracefulCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		gracefulCtx, cancel := context.WithTimeout(context.Background(), gracefulTimeout)
 		defer cancel()
 
 		//nolint:contextcheck

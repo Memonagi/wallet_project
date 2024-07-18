@@ -7,6 +7,8 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/database"
 	"github.com/Memonagi/wallet_project/internal/handlers"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,9 +23,11 @@ func main() {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
 
-	if err := db.MigrateUsers(ctx); err != nil {
+	if err := db.Migrate(migrate.Up); err != nil {
 		logrus.Panicf("failed to migrate users: %v", err)
 	}
+
+	logrus.Info("migrated successfully")
 
 	server := handlers.New(port)
 
