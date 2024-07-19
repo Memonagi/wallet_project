@@ -1,30 +1,70 @@
 package generateusers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/Memonagi/wallet_project/internal/producer"
+	"github.com/Memonagi/wallet_project/internal/models"
 )
+
+type producer interface {
+	ProduceUsers(key, value string) error
+}
+
+type Generator struct {
+	producer producer
+}
 
 const (
-	userIDMax      = 1000
-	userIDMin      = 1
-	userNameLen    = 7
-	userSurnameLen = 8
-	userAgeMax     = 82
-	userAgeMin     = 18
-	firstBool      = 2
-	secBool        = 0
+	userIDMax       = 1000
+	userIDMin       = 1
+	userNameLen     = 7
+	userSurnameLen  = 8
+	userAgeMax      = 82
+	userAgeMin      = 18
+	firstBool       = 2
+	secBool         = 0
+	generatorTicker = 200 * time.Millisecond
 )
 
-func GenerateInfo() *producer.ProduceUsers {
+func New(producer producer) *Generator {
+	return &Generator{producer: producer}
+}
+
+func (g *Generator) Run(ctx context.Context) error {
+	t := time.NewTicker(generatorTicker)
+	defer t.Stop()
+
+	for {
+		users := generateInfo()
+
+		usersJSON, err := json.Marshal(users)
+		if err != nil {
+			return fmt.Errorf("failed to marshal users: %w", err)
+		}
+
+		if err := g.producer.ProduceUsers("", string(usersJSON)); err != nil {
+			return fmt.Errorf("failed to produce users: %w", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+		}
+	}
+}
+
+func generateInfo() *models.UserExternal {
 	//nolint:gosec
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	//nolint:gosec
 	createdAt := time.Now().Add(-time.Duration(rand.Intn(userIDMax)) * time.Hour)
 
-	return &producer.ProduceUsers{
+	return &models.UserExternal{
 		//nolint:gosec
 		UserID:      rand.Intn(userIDMax) + userIDMin,
 		UserName:    randomString(userNameLen),
