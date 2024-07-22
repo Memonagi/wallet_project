@@ -1,4 +1,4 @@
-package handlers
+package server
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Handler struct {
+type Server struct {
 	server http.Server
 	port   int
 }
@@ -21,10 +21,10 @@ const (
 	gracefulTimeout   = 10 * time.Second
 )
 
-func New(port int) *Handler {
+func New(port int) *Server {
 	r := chi.NewRouter()
 
-	return &Handler{
+	return &Server{
 		//nolint:exhaustivestruct
 		server: http.Server{
 			Addr:              fmt.Sprintf(":%d", port),
@@ -35,29 +35,29 @@ func New(port int) *Handler {
 	}
 }
 
-func (h *Handler) Run(ctx context.Context) error {
-	logrus.Info("starting server on port ", h.port)
+func (s *Server) Run(ctx context.Context) error {
+	logrus.Info("starting server on port ", s.port)
 
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 
 	go func() {
 		<-ctx.Done()
-		logrus.Info("shutting down server")
+		logrus.Info("shutting down server on port ", s.port)
 
 		gracefulCtx, cancel := context.WithTimeout(context.Background(), gracefulTimeout)
 		defer cancel()
 
 		//nolint:contextcheck
-		if err := h.server.Shutdown(gracefulCtx); err != nil {
+		if err := s.server.Shutdown(gracefulCtx); err != nil {
 			logrus.Warnf("error graceful shutting down server: %v", err)
 
 			return
 		}
 	}()
 
-	if err := h.server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
-		logrus.Errorf("error listening on port %d: %v", h.port, err)
+	if err := s.server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+		logrus.Errorf("error listening on port %d: %v", s.port, err)
 	}
 
 	return nil
