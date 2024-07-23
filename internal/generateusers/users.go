@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/google/uuid"
 )
 
 type producer interface {
@@ -20,7 +21,6 @@ type Generator struct {
 
 const (
 	userIDMax       = 1000
-	userIDMin       = 1
 	userNameLen     = 7
 	userSurnameLen  = 8
 	userAgeMax      = 82
@@ -65,8 +65,7 @@ func generateInfo() *models.UserExternal {
 	createdAt := time.Now().Add(-time.Duration(rand.Intn(userIDMax)) * time.Hour)
 
 	return &models.UserExternal{
-		//nolint:gosec
-		UserID:      rand.Intn(userIDMax) + userIDMin,
+		UserID:      uuid.New(),
 		UserName:    randomString(userNameLen),
 		UserSurname: randomString(userSurnameLen),
 		//nolint:gosec

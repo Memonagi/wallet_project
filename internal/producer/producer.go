@@ -19,6 +19,14 @@ func New(address string) (*Producer, error) {
 	return &Producer{producer: producer}, nil
 }
 
+func (p *Producer) Close() error {
+	if err := p.producer.Close(); err != nil {
+		return fmt.Errorf("error closing producer: %w", err)
+	}
+
+	return nil
+}
+
 func (p *Producer) produceMessage(topic, key, message string) error {
 	if _, _, err := p.producer.SendMessage(&sarama.ProducerMessage{
 		Topic: topic,

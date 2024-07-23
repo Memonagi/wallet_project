@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 
+	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
@@ -76,6 +77,22 @@ func (s *Store) Migrate(direction migrate.MigrationDirection) error {
 
 	if _, err := migrate.Exec(db, "postgres", asset, direction); err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) Upsert(ctx context.Context, users models.UsersInfo) error {
+	query := `INSERT INTO users (user_id, status, archived, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (user_id) DO UPDATE SET 
+    status = excluded.status, 
+    archived = excluded.archived,
+    updated_at = NOW()`
+
+	_, err := s.db.Exec(ctx, query, users.UserID, users.Status, users.Archived, users.CreatedAt, users.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to upsert users: %w", err)
 	}
 
 	return nil
