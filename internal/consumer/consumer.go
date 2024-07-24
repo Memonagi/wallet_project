@@ -7,6 +7,7 @@ import (
 
 	"github.com/IBM/sarama"
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/sirupsen/logrus"
 )
 
 type infoSaver interface {
@@ -35,7 +36,14 @@ func (c *Consumer) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error consuming users: %w", err)
 	}
-	defer partConsumer.Close()
+
+	defer func() {
+		if err := partConsumer.Close(); err != nil {
+			logrus.Warnf("error closing consumer: %v", err)
+
+			return
+		}
+	}()
 
 	for {
 		select {

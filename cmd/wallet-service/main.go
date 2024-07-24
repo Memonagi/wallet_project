@@ -37,7 +37,7 @@ func main() {
 
 	defer func() {
 		if err := kafkaConsumer.Close(); err != nil {
-			logrus.Panicf("failed to close consumer: %v", err)
+			logrus.Warnf("failed to close consumer: %v", err)
 		}
 	}()
 
