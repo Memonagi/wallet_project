@@ -5,6 +5,7 @@ go 1.22.4
 require (
 	github.com/IBM/sarama v1.43.2
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/rubenv/sql-migrate v1.7.0
 	github.com/sirupsen/logrus v1.9.3

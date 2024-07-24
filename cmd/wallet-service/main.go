@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	"github.com/Memonagi/wallet_project/internal/server"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -29,9 +30,24 @@ func main() {
 
 	logrus.Info("migrated successfully")
 
-	server := server.New(port)
+	kafkaConsumer, err := consumer.New(db, "localhost:9094")
+	if err != nil {
+		logrus.Panicf("failed to connect to consumer: %v", err)
+	}
 
-	if err := server.Run(ctx); err != nil {
+	defer func() {
+		if err := kafkaConsumer.Close(); err != nil {
+			logrus.Panicf("failed to close consumer: %v", err)
+		}
+	}()
+
+	if err := kafkaConsumer.Run(ctx); err != nil {
+		logrus.Panicf("failed to start consumer: %v", err)
+	}
+
+	newServer := server.New(port)
+
+	if err := newServer.Run(ctx); err != nil {
 		logrus.Panicf("failed to start server: %v", err)
 	}
 }

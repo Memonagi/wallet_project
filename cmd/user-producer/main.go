@@ -19,6 +19,12 @@ func main() {
 		logrus.Panicf("Failed to create producer: %v", err)
 	}
 
+	defer func() {
+		if err := kafkaProducer.Close(); err != nil {
+			logrus.Panicf("Failed to close producer: %v", err)
+		}
+	}()
+
 	generator := generateusers.New(kafkaProducer)
 
 	if err := generator.Run(ctx); err != nil {

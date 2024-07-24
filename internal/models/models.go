@@ -1,9 +1,13 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type UserExternal struct {
-	UserID           int       `json:"userId"`
+	UserID           uuid.UUID `json:"userId"`
 	UserName         string    `json:"userName"`
 	UserSurname      string    `json:"userSurname"`
 	UserAge          int       `json:"userAge"`
@@ -15,4 +19,12 @@ type UserExternal struct {
 	Archived         bool      `json:"archived"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+type UsersInfo struct {
+	UserID    uuid.UUID `json:"userId"`
+	Status    string    `json:"status"`
+	Archived  bool      `json:"archived"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
