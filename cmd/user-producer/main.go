@@ -21,7 +21,7 @@ func main() {
 
 	defer func() {
 		if err := kafkaProducer.Close(); err != nil {
-			logrus.Panicf("Failed to close producer: %v", err)
+			logrus.Warnf("Failed to close producer: %v", err)
 		}
 	}()
 

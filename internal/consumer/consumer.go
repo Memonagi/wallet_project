@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/Memonagi/wallet_project/internal/models"
@@ -35,7 +36,13 @@ func (c *Consumer) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error consuming users: %w", err)
 	}
-	defer partConsumer.Close()
+	defer func() {
+		if err := partConsumer.Close(); err != nil {
+			log.Printf("error closing consumer: %v", err)
+
+			return
+		}
+	}()
 
 	for {
 		select {

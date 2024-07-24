@@ -12,7 +12,7 @@ import (
 )
 
 type Server struct {
-	server http.Server
+	server *http.Server
 	port   int
 }
 
@@ -26,7 +26,7 @@ func New(port int) *Server {
 
 	return &Server{
 		//nolint:exhaustivestruct
-		server: http.Server{
+		server: &http.Server{
 			Addr:              fmt.Sprintf(":%d", port),
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
