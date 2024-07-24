@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/sirupsen/logrus"
 )
 
 type infoSaver interface {
@@ -39,7 +39,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 
 	defer func() {
 		if err := partConsumer.Close(); err != nil {
-			log.Printf("error closing consumer: %v", err)
+			logrus.Warnf("error closing consumer: %v", err)
 
 			return
 		}
