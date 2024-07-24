@@ -36,6 +36,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error consuming users: %w", err)
 	}
+
 	defer func() {
 		if err := partConsumer.Close(); err != nil {
 			log.Printf("error closing consumer: %v", err)
