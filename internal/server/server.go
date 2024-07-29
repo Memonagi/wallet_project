@@ -15,9 +15,9 @@ import (
 )
 
 type service interface {
-	CreateWallet(ctx context.Context, wallet models.WalletInfo) error
-	ReadWalletInfo(ctx context.Context, walletID uuid.UUID) (models.WalletInfo, error)
-	UpdateWalletInfo(ctx context.Context, wallet models.WalletInfo) error
+	CreateWallet(ctx context.Context, wallet models.Wallet) error
+	GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error)
+	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) error
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
 }
 
@@ -49,8 +49,8 @@ func New(port int, service service) *Server {
 
 	r.Route("/api/v1/wallets", func(r chi.Router) {
 		r.Post("/", s.createWallet)
-		r.Get("/", s.readWallet)
-		r.Delete("/", s.deleteWallet)
+		r.Get("/{id}", s.getWallet)
+		r.Delete("/{id}", s.deleteWallet)
 	})
 
 	return &s
@@ -109,7 +109,7 @@ func (s *Server) okResponse(w http.ResponseWriter, status int, response any) {
 }
 
 func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
-	var wallet models.WalletInfo
+	var wallet models.Wallet
 
 	if err := json.NewDecoder(r.Body).Decode(&wallet); err != nil {
 		s.errorResponse(w, "error decoding request body", err)
@@ -122,7 +122,7 @@ func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
 	s.okResponse(w, http.StatusOK, "wallet created successfully")
 }
 
-func (s *Server) readWallet(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	uuidTypeID, err := uuid.Parse(id)
@@ -130,7 +130,7 @@ func (s *Server) readWallet(w http.ResponseWriter, r *http.Request) {
 		s.errorResponse(w, "error parsing uuid", err)
 	}
 
-	walletInfo, err := s.service.ReadWalletInfo(r.Context(), uuidTypeID)
+	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
 	}
