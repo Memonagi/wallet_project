@@ -82,10 +82,10 @@ func (s *Store) Migrate(direction migrate.MigrationDirection) error {
 	return nil
 }
 
-func (s *Store) Upsert(ctx context.Context, users models.UsersInfo) error {
-	query := `INSERT INTO users (user_id, status, archived, created_at, updated_at)
+func (s *Store) UpsertUsers(ctx context.Context, users models.UsersInfo) error {
+	query := `INSERT INTO users (id, status, archived, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (user_id) DO UPDATE SET 
+ON CONFLICT (id) DO UPDATE SET 
     status = excluded.status, 
     archived = excluded.archived,
     updated_at = NOW()`

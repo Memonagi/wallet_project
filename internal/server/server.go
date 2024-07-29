@@ -2,18 +2,29 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
+type service interface {
+	CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error)
+	GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error)
+	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
+	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
+}
+
 type Server struct {
-	server *http.Server
-	port   int
+	service service
+	server  *http.Server
+	port    int
 }
 
 const (
@@ -21,10 +32,12 @@ const (
 	gracefulTimeout   = 10 * time.Second
 )
 
-func New(port int) *Server {
+func New(port int, service service) *Server {
 	r := chi.NewRouter()
+	r.Handle("/*", http.FileServer(http.Dir("./web")))
 
-	return &Server{
+	s := Server{
+		service: service,
 		//nolint:exhaustivestruct
 		server: &http.Server{
 			Addr:              fmt.Sprintf(":%d", port),
@@ -33,6 +46,14 @@ func New(port int) *Server {
 		},
 		port: port,
 	}
+
+	r.Route("/api/v1/wallets", func(r chi.Router) {
+		r.Post("/", s.createWallet)
+		r.Get("/{id}", s.getWallet)
+		r.Delete("/{id}", s.deleteWallet)
+	})
+
+	return &s
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -61,4 +82,82 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err error) {
+	statusCode := http.StatusInternalServerError
+
+	if errors.Is(err, models.ErrWalletNotFound) {
+		statusCode = http.StatusNotFound
+	}
+
+	errResp := fmt.Errorf("%s: %w", errorText, err).Error()
+
+	response, err := json.Marshal(errResp)
+	if err != nil {
+		logrus.Warnf("error marshalling response: %v", err)
+	}
+
+	w.WriteHeader(statusCode)
+
+	if _, err := w.Write(response); err != nil {
+		logrus.Warnf("error writing response: %v", err)
+	}
+}
+
+func (s *Server) okResponse(w http.ResponseWriter, status int, response any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logrus.Warnf("error encoding response: %v", err)
+	}
+}
+
+func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
+	var (
+		wallet, newWallet models.Wallet
+		err               error
+	)
+
+	if err = json.NewDecoder(r.Body).Decode(&wallet); err != nil {
+		s.errorResponse(w, "error decoding request body", err)
+	}
+
+	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
+		s.errorResponse(w, "error creating wallet", err)
+	}
+
+	s.okResponse(w, http.StatusOK, newWallet)
+}
+
+func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	uuidTypeID, err := uuid.Parse(id)
+	if err != nil {
+		s.errorResponse(w, "error parsing uuid", err)
+	}
+
+	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	if err != nil {
+		s.errorResponse(w, "error reading wallet", err)
+	}
+
+	s.okResponse(w, http.StatusOK, walletInfo)
+}
+
+func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	uuidTypeID, err := uuid.Parse(id)
+	if err != nil {
+		s.errorResponse(w, "error parsing uuid", err)
+	}
+
+	if err := s.service.DeleteWallet(r.Context(), uuidTypeID); err != nil {
+		s.errorResponse(w, "error deleting wallet", err)
+	}
+
+	s.okResponse(w, http.StatusNoContent, "wallet deleted successfully")
 }

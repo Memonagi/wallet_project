@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os/signal"
 	"syscall"
 
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	"github.com/Memonagi/wallet_project/internal/server"
+	"github.com/Memonagi/wallet_project/internal/service"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 const port = 8080
@@ -41,13 +44,24 @@ func main() {
 		}
 	}()
 
-	if err := kafkaConsumer.Run(ctx); err != nil {
-		logrus.Panicf("failed to start consumer: %v", err)
-	}
+	svc := service.New(db)
+	newServer := server.New(port, svc)
 
-	newServer := server.New(port)
+	eg, ctx := errgroup.WithContext(ctx)
 
-	if err := newServer.Run(ctx); err != nil {
-		logrus.Panicf("failed to start server: %v", err)
+	eg.Go(func() error {
+		err = kafkaConsumer.Run(ctx)
+
+		return fmt.Errorf("kafka consumer stopped: %w", err)
+	})
+
+	eg.Go(func() error {
+		err = newServer.Run(ctx)
+
+		return fmt.Errorf("server stopped: %w", err)
+	})
+
+	if err := eg.Wait(); err != nil {
+		logrus.Panicf("eg.Wait(): %v", err)
 	}
 }
