@@ -11,22 +11,26 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet) error {
+func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
 	query := `INSERT INTO wallets 
-    (id, user_id, name, currency, balance, archived, created_at, updated_at)
-VALUES (uuid.New(), $1, $2, $3, 0, false, now(), now())`
+    (id, user_id, name, currency)
+VALUES (uuid.New(), $1, $2, $3)
+RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at`
 
-	_, err := s.db.Exec(
-		ctx,
-		query,
-		wallet.UserID,
-		wallet.Name,
-		wallet.Currency)
+	err := s.db.QueryRow(ctx, query, wallet.UserID, wallet.Name, wallet.Currency).Scan(
+		&wallet.WalletID,
+		&wallet.UserID,
+		&wallet.Name,
+		&wallet.Currency,
+		&wallet.Balance,
+		&wallet.Archived,
+		&wallet.CreatedAt,
+		&wallet.UpdatedAt)
 	if err != nil {
-		return fmt.Errorf("failed to create wallet: %w", err)
+		return models.Wallet{}, fmt.Errorf("failed to create wallet: %w", err)
 	}
 
-	return nil
+	return wallet, nil
 }
 
 func (s *Store) GetWallet(ctx context.Context, walletID uuid.UUID,
@@ -54,38 +58,60 @@ func (s *Store) GetWallet(ctx context.Context, walletID uuid.UUID,
 	return wallet, nil
 }
 
-func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) error {
+func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID,
+	wallet models.WalletUpdate,
+) (models.Wallet, error) {
 	var (
-		sb   strings.Builder
-		args []any
+		sb           strings.Builder
+		args         []any
+		updateWallet = models.Wallet{}
 	)
 
 	sb.WriteString("UPDATE wallets SET ")
 
 	if wallet.Name != nil {
-		sb.WriteString(fmt.Sprintf("name $%d", len(args)))
+		sb.WriteString(fmt.Sprintf("name = $%d, ", len(args)))
 		args = append(args, wallet.Name)
 	}
 
 	if wallet.Currency != nil {
-		sb.WriteString(fmt.Sprintf("currency $%d", len(args)))
+		if len(args) > 0 {
+			sb.WriteString(", ")
+		}
+
+		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
 		args = append(args, wallet.Currency)
 	}
 
-	sb.WriteString(fmt.Sprintf(" updated_at = NOW() WHERE id = $%d AND archived = false", len(args)))
+	if len(args) == 0 {
+		return s.GetWallet(ctx, walletID, updateWallet)
+	}
+
+	sb.WriteString(fmt.Sprintf("updated_at = NOW() WHERE id = $%d AND archived = false", len(args)))
 	args = append(args, walletID)
+
+	sb.WriteString(" RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at")
 
 	query := sb.String()
 
-	if _, err := s.db.Exec(ctx, query, args...); err != nil {
+	err := s.db.QueryRow(ctx, query, args...).Scan(
+		&updateWallet.WalletID,
+		&updateWallet.UserID,
+		&updateWallet.Name,
+		&updateWallet.Currency,
+		&updateWallet.Balance,
+		&updateWallet.Archived,
+		&updateWallet.CreatedAt,
+		&updateWallet.UpdatedAt)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("failed to update wallet info: %w", models.ErrWalletNotFound)
+			return models.Wallet{}, fmt.Errorf("failed to update wallet info: %w", models.ErrWalletNotFound)
 		}
 
-		return fmt.Errorf("failed to update wallet info: %w", err)
+		return models.Wallet{}, fmt.Errorf("failed to update wallet info: %w", err)
 	}
 
-	return nil
+	return updateWallet, nil
 }
 
 func (s *Store) DeleteWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) error {

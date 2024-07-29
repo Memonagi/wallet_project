@@ -15,9 +15,9 @@ import (
 )
 
 type service interface {
-	CreateWallet(ctx context.Context, wallet models.Wallet) error
+	CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error)
 	GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error)
-	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) error
+	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
 }
 
@@ -85,6 +85,12 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err error) {
+	statusCode := http.StatusInternalServerError
+
+	if errors.Is(err, models.ErrWalletNotFound) {
+		statusCode = http.StatusNotFound
+	}
+
 	errResp := fmt.Errorf("%s: %w", errorText, err).Error()
 
 	response, err := json.Marshal(errResp)
@@ -92,7 +98,7 @@ func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err erro
 		logrus.Warnf("error marshalling response: %v", err)
 	}
 
-	w.WriteHeader(http.StatusInternalServerError)
+	w.WriteHeader(statusCode)
 
 	if _, err := w.Write(response); err != nil {
 		logrus.Warnf("error writing response: %v", err)
@@ -109,17 +115,20 @@ func (s *Server) okResponse(w http.ResponseWriter, status int, response any) {
 }
 
 func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
-	var wallet models.Wallet
+	var (
+		wallet, newWallet models.Wallet
+		err               error
+	)
 
-	if err := json.NewDecoder(r.Body).Decode(&wallet); err != nil {
+	if err = json.NewDecoder(r.Body).Decode(&wallet); err != nil {
 		s.errorResponse(w, "error decoding request body", err)
 	}
 
-	if err := s.service.CreateWallet(r.Context(), wallet); err != nil {
+	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
 		s.errorResponse(w, "error creating wallet", err)
 	}
 
-	s.okResponse(w, http.StatusOK, "wallet created successfully")
+	s.okResponse(w, http.StatusOK, newWallet)
 }
 
 func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {

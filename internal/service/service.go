@@ -9,9 +9,9 @@ import (
 )
 
 type wallets interface {
-	CreateWallet(ctx context.Context, wallet models.Wallet) error
+	CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error)
 	GetWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) (models.Wallet, error)
-	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) error
+	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) error
 }
 
@@ -23,16 +23,21 @@ func New(wallets wallets) *Service {
 	return &Service{wallets: wallets}
 }
 
-func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet) error {
+func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
 	if err := wallet.Validate(); err != nil {
-		return fmt.Errorf("%w", err)
+		return models.Wallet{}, fmt.Errorf("%w", err)
 	}
 
-	if err := s.wallets.CreateWallet(ctx, wallet); err != nil {
-		return fmt.Errorf("failed create new wallet: %w", err)
+	var (
+		newWallet models.Wallet
+		err       error
+	)
+
+	if newWallet, err = s.wallets.CreateWallet(ctx, wallet); err != nil {
+		return models.Wallet{}, fmt.Errorf("failed create new wallet: %w", err)
 	}
 
-	return nil
+	return newWallet, nil
 }
 
 func (s *Service) GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error) {
@@ -50,16 +55,23 @@ func (s *Service) GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wal
 	return walletInfo, nil
 }
 
-func (s *Service) UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) error {
+func (s *Service) UpdateWallet(ctx context.Context, walletID uuid.UUID,
+	wallet models.WalletUpdate,
+) (models.Wallet, error) {
 	if err := wallet.Validate(); err != nil {
-		return fmt.Errorf("%w", err)
+		return models.Wallet{}, fmt.Errorf("%w", err)
 	}
 
-	if err := s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
-		return fmt.Errorf("failed update wallet info: %w", err)
+	var (
+		updateWallet models.Wallet
+		err          error
+	)
+
+	if updateWallet, err = s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
+		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 
-	return nil
+	return updateWallet, nil
 }
 
 func (s *Service) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
