@@ -87,13 +87,21 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err error) {
 	statusCode := http.StatusInternalServerError
 
-	if errors.Is(err, models.ErrWalletNotFound) {
+	switch {
+	case errors.Is(err, models.ErrWalletNotFound):
+		statusCode = http.StatusNotFound
+	case errors.Is(err, models.ErrUserNotFound):
 		statusCode = http.StatusNotFound
 	}
 
-	errResp := fmt.Errorf("%s: %w", errorText, err).Error()
+	errText := fmt.Errorf("%s: %w", errorText, err).Error()
+	if statusCode == http.StatusInternalServerError {
+		errText = http.StatusText(http.StatusInternalServerError)
 
-	response, err := json.Marshal(errResp)
+		logrus.Warn(err.Error())
+	}
+
+	response, err := json.Marshal(errText)
 	if err != nil {
 		logrus.Warnf("error marshalling response: %v", err)
 	}
@@ -122,13 +130,17 @@ func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
 
 	if err = json.NewDecoder(r.Body).Decode(&wallet); err != nil {
 		s.errorResponse(w, "error decoding request body", err)
+
+		return
 	}
 
 	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
 		s.errorResponse(w, "error creating wallet", err)
+
+		return
 	}
 
-	s.okResponse(w, http.StatusOK, newWallet)
+	s.okResponse(w, http.StatusCreated, newWallet)
 }
 
 func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
@@ -137,11 +149,15 @@ func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 	uuidTypeID, err := uuid.Parse(id)
 	if err != nil {
 		s.errorResponse(w, "error parsing uuid", err)
+
+		return
 	}
 
 	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
+
+		return
 	}
 
 	s.okResponse(w, http.StatusOK, walletInfo)
@@ -153,10 +169,14 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 	uuidTypeID, err := uuid.Parse(id)
 	if err != nil {
 		s.errorResponse(w, "error parsing uuid", err)
+
+		return
 	}
 
 	if err := s.service.DeleteWallet(r.Context(), uuidTypeID); err != nil {
 		s.errorResponse(w, "error deleting wallet", err)
+
+		return
 	}
 
 	s.okResponse(w, http.StatusNoContent, "wallet deleted successfully")

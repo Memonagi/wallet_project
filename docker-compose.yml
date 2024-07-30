@@ -28,6 +28,13 @@ services:
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
 
+  user-producer:
+    build:
+      dockerfile: deployments/user-producer/Dockerfile
+      context: .
+    environment:
+      - KAFKA_HOST=kafka
+
 volumes:
   kafka_data:
     driver: local

@@ -48,10 +48,11 @@ type WalletUpdate struct {
 }
 
 var (
-	errEmptyName      = errors.New("wallet name is empty")
-	errWrongCurrency  = errors.New("wallet currency is invalid")
+	ErrEmptyName      = errors.New("wallet name is empty")
+	ErrWrongCurrency  = errors.New("wallet currency is invalid")
 	ErrEmptyID        = errors.New("wallet ID is empty")
 	ErrWalletNotFound = errors.New("wallet not found")
+	ErrUserNotFound   = errors.New("user not found")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},
@@ -66,12 +67,12 @@ var (
 
 func (w *Wallet) Validate() error {
 	if w.Name == "" {
-		return errEmptyName
+		return ErrEmptyName
 	}
 
 	_, ok := currencies[strings.ToUpper(w.Currency)]
 	if !ok {
-		return errWrongCurrency
+		return ErrWrongCurrency
 	}
 
 	return nil
@@ -79,12 +80,12 @@ func (w *Wallet) Validate() error {
 
 func (u *WalletUpdate) Validate() error {
 	if *u.Name == "" {
-		return errEmptyName
+		return ErrEmptyName
 	}
 
 	_, ok := currencies[strings.ToUpper(*u.Currency)]
 	if !ok {
-		return errWrongCurrency
+		return ErrWrongCurrency
 	}
 
 	return nil

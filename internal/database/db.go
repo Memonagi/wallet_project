@@ -20,9 +20,7 @@ type Store struct {
 //go:embed migrations
 var migrations embed.FS
 
-func New(ctx context.Context) (*Store, error) {
-	dsn := "postgresql://user:password@localhost:5432/mydatabase"
-
+func New(ctx context.Context, dsn string) (*Store, error) {
 	db, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -82,7 +80,7 @@ func (s *Store) Migrate(direction migrate.MigrationDirection) error {
 	return nil
 }
 
-func (s *Store) UpsertUsers(ctx context.Context, users models.UsersInfo) error {
+func (s *Store) UpsertUser(ctx context.Context, users models.UsersInfo) error {
 	query := `INSERT INTO users (id, status, archived, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (id) DO UPDATE SET 

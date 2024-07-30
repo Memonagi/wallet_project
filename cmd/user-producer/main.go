@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -14,7 +16,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	kafkaProducer, err := producer.New("localhost:9094")
+	kafkaHost := os.Getenv("KAFKA_HOST")
+	if kafkaHost == "" {
+		kafkaHost = "localhost"
+	}
+
+	kafkaProducer, err := producer.New(fmt.Sprintf("%s:9094", kafkaHost))
 	if err != nil {
 		logrus.Panicf("Failed to create producer: %v", err)
 	}

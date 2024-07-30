@@ -22,7 +22,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.New(ctx)
+	dsn := "postgresql://user:password@localhost:5432/mydatabase"
+
+	db, err := database.New(ctx, dsn)
 	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}

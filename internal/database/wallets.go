@@ -8,16 +8,18 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
 	query := `INSERT INTO wallets 
     (id, user_id, name, currency)
-VALUES (uuid.New(), $1, $2, $3)
+VALUES ($1, $2, $3, $4)
 RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at`
 
-	err := s.db.QueryRow(ctx, query, wallet.UserID, wallet.Name, wallet.Currency).Scan(
+	err := s.db.QueryRow(ctx, query, uuid.New(), wallet.UserID, wallet.Name, wallet.Currency).Scan(
 		&wallet.WalletID,
 		&wallet.UserID,
 		&wallet.Name,
@@ -27,6 +29,12 @@ RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at
 		&wallet.CreatedAt,
 		&wallet.UpdatedAt)
 	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
+			return models.Wallet{}, models.ErrUserNotFound
+		}
+
 		return models.Wallet{}, fmt.Errorf("failed to create wallet: %w", err)
 	}
 
