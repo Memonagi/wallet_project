@@ -16,13 +16,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const port = 8080
+const (
+	port = 8080
+	dsn  = "postgresql://user:password@localhost:5432/mydatabase"
+)
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.New(ctx)
+	db, err := database.New(ctx, dsn)
 	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
@@ -45,7 +48,7 @@ func main() {
 	}()
 
 	svc := service.New(db)
-	newServer := server.New(port, svc)
+	httpServer := server.New(port, svc)
 
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -56,7 +59,7 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		err = newServer.Run(ctx)
+		err = httpServer.Run(ctx)
 
 		return fmt.Errorf("server stopped: %w", err)
 	})

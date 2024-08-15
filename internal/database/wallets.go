@@ -8,16 +8,18 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
 	query := `INSERT INTO wallets 
     (id, user_id, name, currency)
-VALUES (uuid.New(), $1, $2, $3)
+VALUES ($1, $2, $3, $4)
 RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at`
 
-	err := s.db.QueryRow(ctx, query, wallet.UserID, wallet.Name, wallet.Currency).Scan(
+	err := s.db.QueryRow(ctx, query, uuid.New(), wallet.UserID, wallet.Name, wallet.Currency).Scan(
 		&wallet.WalletID,
 		&wallet.UserID,
 		&wallet.Name,
@@ -27,6 +29,12 @@ RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at
 		&wallet.CreatedAt,
 		&wallet.UpdatedAt)
 	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
+			return models.Wallet{}, models.ErrUserNotFound
+		}
+
 		return models.Wallet{}, fmt.Errorf("failed to create wallet: %w", err)
 	}
 
@@ -62,47 +70,43 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 	wallet models.WalletUpdate,
 ) (models.Wallet, error) {
 	var (
-		sb           strings.Builder
-		args         []any
-		updateWallet = models.Wallet{}
+		sb            strings.Builder
+		args          []any
+		updatedWallet = models.Wallet{}
 	)
 
 	sb.WriteString("UPDATE wallets SET ")
 
 	if wallet.Name != nil {
-		sb.WriteString(fmt.Sprintf("name = $%d, ", len(args)))
 		args = append(args, wallet.Name)
+		sb.WriteString(fmt.Sprintf("name = $%d, ", len(args)))
 	}
 
 	if wallet.Currency != nil {
-		if len(args) > 0 {
-			sb.WriteString(", ")
-		}
-
-		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
 		args = append(args, wallet.Currency)
+		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
 	}
 
 	if len(args) == 0 {
-		return s.GetWallet(ctx, walletID, updateWallet)
+		return s.GetWallet(ctx, walletID, updatedWallet)
 	}
 
-	sb.WriteString(fmt.Sprintf("updated_at = NOW() WHERE id = $%d AND archived = false", len(args)))
 	args = append(args, walletID)
+	sb.WriteString(fmt.Sprintf("updated_at = NOW() WHERE id = $%d AND archived = false", len(args)))
 
 	sb.WriteString(" RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at")
 
 	query := sb.String()
 
 	err := s.db.QueryRow(ctx, query, args...).Scan(
-		&updateWallet.WalletID,
-		&updateWallet.UserID,
-		&updateWallet.Name,
-		&updateWallet.Currency,
-		&updateWallet.Balance,
-		&updateWallet.Archived,
-		&updateWallet.CreatedAt,
-		&updateWallet.UpdatedAt)
+		&updatedWallet.WalletID,
+		&updatedWallet.UserID,
+		&updatedWallet.Name,
+		&updatedWallet.Currency,
+		&updatedWallet.Balance,
+		&updatedWallet.Archived,
+		&updatedWallet.CreatedAt,
+		&updatedWallet.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Wallet{}, fmt.Errorf("failed to update wallet info: %w", models.ErrWalletNotFound)
@@ -111,22 +115,102 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 		return models.Wallet{}, fmt.Errorf("failed to update wallet info: %w", err)
 	}
 
-	return updateWallet, nil
+	return updatedWallet, nil
 }
 
-func (s *Store) DeleteWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) error {
+func (s *Store) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
 	query := `UPDATE wallets SET
-	archived = $2, 
+	archived = true, 
 	updated_at = NOW()
 	WHERE id = $1 AND archived = false`
 
-	if _, err := s.db.Exec(ctx, query, walletID, wallet.Archived); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("failed to delete wallet: %w", models.ErrWalletNotFound)
-		}
-
-		return fmt.Errorf("failed to delete wallet: %w", err)
+	res, err := s.db.Exec(ctx, query, walletID)
+	if err != nil || res.RowsAffected() == 0 {
+		return fmt.Errorf("failed to delete wallet: %w", models.ErrWalletNotFound)
 	}
 
 	return nil
+}
+
+func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error) {
+	var (
+		wallets []models.Wallet
+		rows    pgx.Rows
+		err     error
+	)
+
+	query, args := s.getWalletsQuery(request)
+	if rows, err = s.db.Query(ctx, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to get wallets: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var wallet models.Wallet
+		if err = rows.Scan(
+			&wallet.WalletID,
+			&wallet.UserID,
+			&wallet.Name,
+			&wallet.Currency,
+			&wallet.Balance,
+			&wallet.Archived,
+			&wallet.CreatedAt,
+			&wallet.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan wallets: %w", err)
+		}
+
+		wallets = append(wallets, wallet)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to get wallets: %w", err)
+	}
+
+	return wallets, nil
+}
+
+func (s *Store) getWalletsQuery(request models.GetWalletsRequest) (string, []any) {
+	var (
+		sb             strings.Builder
+		args           []any
+		validSortParam = map[string]string{
+			"id":         "id",
+			"name":       "name",
+			"currency":   "currency",
+			"balance":    "balance",
+			"created_at": "created_at",
+			"updated_at": "updated_at",
+		}
+	)
+
+	sb.WriteString("SELECT * FROM wallets WHERE archived = false")
+
+	if request.Filter != "" {
+		args = append(args, "%"+request.Filter+"%")
+		sb.WriteString(fmt.Sprintf(` AND concat_ws(' ', id, name, currency, balance, created_at, updated_at) 
+ILIKE $%d`, len(args)))
+	}
+
+	sorting, ok := validSortParam[request.Sorting]
+
+	if !ok {
+		sorting = "id"
+	}
+
+	sb.WriteString(" ORDER BY " + sorting)
+
+	if request.Descending {
+		sb.WriteString(" DESC")
+	}
+
+	args = append(args, request.Limit)
+	sb.WriteString(fmt.Sprintf(" LIMIT $%d", len(args)))
+
+	if request.Offset > 0 {
+		args = append(args, request.Offset)
+		sb.WriteString(fmt.Sprintf(" OFFSET $%d", len(args)))
+	}
+
+	return sb.String(), args
 }

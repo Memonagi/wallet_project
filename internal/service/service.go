@@ -12,7 +12,8 @@ type wallets interface {
 	CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error)
 	GetWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) (models.Wallet, error)
 	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
-	DeleteWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) error
+	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
+	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
 }
 
 type Service struct {
@@ -63,15 +64,15 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 	}
 
 	var (
-		updateWallet models.Wallet
-		err          error
+		updatedWallet models.Wallet
+		err           error
 	)
 
-	if updateWallet, err = s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
+	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
 		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 
-	return updateWallet, nil
+	return updatedWallet, nil
 }
 
 func (s *Service) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
@@ -79,11 +80,18 @@ func (s *Service) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
 		return fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
-	var wallet models.Wallet
-
-	if err := s.wallets.DeleteWallet(ctx, walletID, wallet); err != nil {
+	if err := s.wallets.DeleteWallet(ctx, walletID); err != nil {
 		return fmt.Errorf("failed delete wallet: %w", err)
 	}
 
 	return nil
+}
+
+func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error) {
+	wallets, err := s.wallets.GetWallets(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed get all wallets: %w", err)
+	}
+
+	return wallets, nil
 }
