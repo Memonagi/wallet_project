@@ -22,12 +22,28 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+          image: postgres:latest
+          ports: ['5432:5432']
+          options: >-
+            --health-cmd pg_isready
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+          env:
+            POSTGRES_DB: mydatabase
+            POSTGRES_USER: ${{secrets.DB_USERNAME}}
+            POSTGRES_PASSWORD: ${{secrets.DB_PASSWORD}}
+    env:
+      DATABASE_URL: postgres://${{secrets.DB_USERNAME}}:${{secrets.DB_PASSWORD}}@localhost:5432/mydatabase
     steps:
       - uses: actions/setup-go@v5
         with:
           cache: false
           go-version: '1.22.4'
       - uses: actions/checkout@v4
+      - run: until pg_isready -h localhost -p 5432; do echo "Waiting for postgres..."; sleep 1; done
       - run: go test -race ./...
 
   build:
