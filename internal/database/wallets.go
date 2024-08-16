@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -167,6 +168,10 @@ func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest
 		return nil, fmt.Errorf("failed to get wallets: %w", err)
 	}
 
+	if len(wallets) == 0 {
+		return []models.Wallet{}, nil
+	}
+
 	return wallets, nil
 }
 
@@ -202,6 +207,10 @@ ILIKE $%d`, len(args)))
 
 	if request.Descending {
 		sb.WriteString(" DESC")
+	}
+
+	if request.Limit == 0 {
+		request.Limit = server.DefaultLimit
 	}
 
 	args = append(args, request.Limit)

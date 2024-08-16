@@ -32,7 +32,7 @@ type Server struct {
 const (
 	readHeaderTimeout = 5 * time.Second
 	gracefulTimeout   = 10 * time.Second
-	defaultLimit      = 25
+	DefaultLimit      = 25
 )
 
 func New(port int, service service) *Server {
@@ -248,7 +248,7 @@ func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
 
 	if l := queryParams.Get("limit"); l != "" {
 		if limit, _ = strconv.ParseInt(l, 0, 64); limit == 0 {
-			limit = defaultLimit
+			limit = DefaultLimit
 		}
 	}
 
