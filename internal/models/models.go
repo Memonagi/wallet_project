@@ -47,11 +47,20 @@ type WalletUpdate struct {
 	Currency *string `json:"currency"`
 }
 
+type GetWalletsRequest struct {
+	Sorting    string `json:"sorting,omitempty"`
+	Descending bool   `json:"descending,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+	Filter     string `json:"filter,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+}
+
 var (
 	errEmptyName      = errors.New("wallet name is empty")
 	errWrongCurrency  = errors.New("wallet currency is invalid")
 	ErrEmptyID        = errors.New("wallet ID is empty")
 	ErrWalletNotFound = errors.New("wallet not found")
+	ErrUserNotFound   = errors.New("user not found")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},

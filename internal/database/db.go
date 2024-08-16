@@ -20,9 +20,7 @@ type Store struct {
 //go:embed migrations
 var migrations embed.FS
 
-func New(ctx context.Context) (*Store, error) {
-	dsn := "postgresql://user:password@localhost:5432/mydatabase"
-
+func New(ctx context.Context, dsn string) (*Store, error) {
 	db, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -82,7 +80,7 @@ func (s *Store) Migrate(direction migrate.MigrationDirection) error {
 	return nil
 }
 
-func (s *Store) UpsertUsers(ctx context.Context, users models.UsersInfo) error {
+func (s *Store) UpsertUser(ctx context.Context, users models.UsersInfo) error {
 	query := `INSERT INTO users (id, status, archived, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (id) DO UPDATE SET 
@@ -93,6 +91,16 @@ ON CONFLICT (id) DO UPDATE SET
 	_, err := s.db.Exec(ctx, query, users.UserID, users.Status, users.Archived, users.CreatedAt, users.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to upsert users: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) Truncate(ctx context.Context, tables ...string) error {
+	for _, table := range tables {
+		if _, err := s.db.Exec(ctx, "DELETE FROM "+table); err != nil {
+			return fmt.Errorf("failed to truncate table: %w", err)
+		}
 	}
 
 	return nil

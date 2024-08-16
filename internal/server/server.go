@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
@@ -19,6 +20,7 @@ type service interface {
 	GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error)
 	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
+	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
 }
 
 type Server struct {
@@ -30,11 +32,11 @@ type Server struct {
 const (
 	readHeaderTimeout = 5 * time.Second
 	gracefulTimeout   = 10 * time.Second
+	DefaultLimit      = 25
 )
 
 func New(port int, service service) *Server {
 	r := chi.NewRouter()
-	r.Handle("/*", http.FileServer(http.Dir("./web")))
 
 	s := Server{
 		service: service,
@@ -50,7 +52,9 @@ func New(port int, service service) *Server {
 	r.Route("/api/v1/wallets", func(r chi.Router) {
 		r.Post("/", s.createWallet)
 		r.Get("/{id}", s.getWallet)
+		r.Patch("/{id}", s.updateWallet)
 		r.Delete("/{id}", s.deleteWallet)
+		r.Get("/", s.getWallets)
 	})
 
 	return &s
@@ -87,11 +91,21 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err error) {
 	statusCode := http.StatusInternalServerError
 
-	if errors.Is(err, models.ErrWalletNotFound) {
+	switch {
+	case errors.Is(err, models.ErrWalletNotFound):
+		statusCode = http.StatusNotFound
+	case errors.Is(err, models.ErrUserNotFound):
+		statusCode = http.StatusNotFound
+	case errors.Is(err, models.ErrEmptyID):
 		statusCode = http.StatusNotFound
 	}
 
 	errResp := fmt.Errorf("%s: %w", errorText, err).Error()
+	if statusCode == http.StatusInternalServerError {
+		errResp = http.StatusText(http.StatusInternalServerError)
+
+		logrus.Warn(err.Error())
+	}
 
 	response, err := json.Marshal(errResp)
 	if err != nil {
@@ -122,13 +136,17 @@ func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
 
 	if err = json.NewDecoder(r.Body).Decode(&wallet); err != nil {
 		s.errorResponse(w, "error decoding request body", err)
+
+		return
 	}
 
 	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
 		s.errorResponse(w, "error creating wallet", err)
+
+		return
 	}
 
-	s.okResponse(w, http.StatusOK, newWallet)
+	s.okResponse(w, http.StatusCreated, newWallet)
 }
 
 func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
@@ -137,14 +155,46 @@ func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 	uuidTypeID, err := uuid.Parse(id)
 	if err != nil {
 		s.errorResponse(w, "error parsing uuid", err)
+
+		return
 	}
 
 	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
+
+		return
 	}
 
 	s.okResponse(w, http.StatusOK, walletInfo)
+}
+
+func (s *Server) updateWallet(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	uuidTypeID, err := uuid.Parse(id)
+	if err != nil {
+		s.errorResponse(w, "error parsing uuid", err)
+
+		return
+	}
+
+	var wallet models.WalletUpdate
+
+	if err = json.NewDecoder(r.Body).Decode(&wallet); err != nil {
+		s.errorResponse(w, "error decoding request body", err)
+
+		return
+	}
+
+	updatedWallet, err := s.service.UpdateWallet(r.Context(), uuidTypeID, wallet)
+	if err != nil {
+		s.errorResponse(w, "error updating wallet", err)
+
+		return
+	}
+
+	s.okResponse(w, http.StatusOK, updatedWallet)
 }
 
 func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
@@ -153,11 +203,61 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 	uuidTypeID, err := uuid.Parse(id)
 	if err != nil {
 		s.errorResponse(w, "error parsing uuid", err)
+
+		return
 	}
 
 	if err := s.service.DeleteWallet(r.Context(), uuidTypeID); err != nil {
 		s.errorResponse(w, "error deleting wallet", err)
+
+		return
 	}
 
-	s.okResponse(w, http.StatusNoContent, "wallet deleted successfully")
+	s.okResponse(w, http.StatusOK, "wallet deleted successfully")
+}
+
+func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
+	request := parseGetWalletsRequest(r)
+
+	wallets, err := s.service.GetWallets(r.Context(), request)
+	if err != nil {
+		s.errorResponse(w, "error getting wallets", err)
+
+		return
+	}
+
+	s.okResponse(w, http.StatusOK, wallets)
+}
+
+func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
+	queryParams := r.URL.Query()
+
+	g := models.GetWalletsRequest{
+		Sorting: queryParams.Get("sorting"),
+		Filter:  queryParams.Get("filter"),
+	}
+
+	var (
+		limit  int64
+		offset int64
+	)
+
+	if d := queryParams.Get("descending"); d != "" {
+		g.Descending, _ = strconv.ParseBool(d)
+	}
+
+	if l := queryParams.Get("limit"); l != "" {
+		if limit, _ = strconv.ParseInt(l, 0, 64); limit == 0 {
+			limit = DefaultLimit
+		}
+	}
+
+	if o := queryParams.Get("offset"); o != "" {
+		offset, _ = strconv.ParseInt(o, 0, 64)
+	}
+
+	g.Limit = int(limit)
+	g.Offset = int(offset)
+
+	return g
 }
