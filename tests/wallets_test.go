@@ -9,6 +9,7 @@ import (
 )
 
 func (s *IntegrationTestSuite) TestCreateWallet() {
+	// Arrange
 	wallet := models.Wallet{
 		WalletID: uuid.New(),
 		UserID:   uuid.New(),
@@ -17,6 +18,7 @@ func (s *IntegrationTestSuite) TestCreateWallet() {
 	}
 
 	s.Run("user not found", func() {
+		// Act
 		s.sendRequest(http.MethodPost, walletPath, http.StatusNotFound, &wallet, nil)
 	})
 
@@ -27,8 +29,10 @@ func (s *IntegrationTestSuite) TestCreateWallet() {
 		wallet.UserID = existingUser.UserID
 		createdWallet := models.Wallet{}
 
+		// Act
 		s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &wallet, &createdWallet)
 
+		// Assert
 		s.Require().Equal(wallet.UserID, createdWallet.UserID)
 		s.Require().Equal(wallet.Name, createdWallet.Name)
 		s.Require().Equal(wallet.Currency, createdWallet.Currency)
@@ -36,6 +40,7 @@ func (s *IntegrationTestSuite) TestCreateWallet() {
 }
 
 func (s *IntegrationTestSuite) TestGetWallet() {
+	// Arrange
 	wallet := models.Wallet{
 		WalletID: uuid.New(),
 		UserID:   uuid.New(),
@@ -47,6 +52,7 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 		uuidString := wallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodGet, walletIDPath, http.StatusNotFound, nil, nil)
 	})
 
@@ -62,8 +68,10 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodGet, walletIDPath, http.StatusOK, nil, &createdWallet)
 
+		// Assert
 		s.Require().Equal(wallet.UserID, createdWallet.UserID)
 		s.Require().Equal(wallet.Name, createdWallet.Name)
 		s.Require().Equal(wallet.Currency, createdWallet.Currency)
@@ -71,6 +79,7 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 }
 
 func (s *IntegrationTestSuite) TestUpdateWallet() {
+	// Arrange
 	wallet := models.Wallet{
 		WalletID: uuid.New(),
 		UserID:   uuid.New(),
@@ -81,6 +90,8 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 	s.Run("user not found", func() {
 		uuidString := wallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
+
+		// Act
 		s.sendRequest(http.MethodPatch, walletIDPath, http.StatusNotFound, &wallet, nil)
 	})
 
@@ -102,8 +113,10 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodPatch, walletIDPath, http.StatusOK, &updatedWallet, &createdWallet)
 
+		// Assert
 		s.Require().Equal(updatedWallet.UserID, createdWallet.UserID)
 		s.Require().Equal(updatedWallet.Name, createdWallet.Name)
 		s.Require().Equal(updatedWallet.Currency, createdWallet.Currency)
@@ -127,8 +140,10 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodPatch, walletIDPath, http.StatusOK, &updatedWallet, &createdWallet)
 
+		// Assert
 		s.Require().Equal(updatedWallet.UserID, createdWallet.UserID)
 		s.Require().Equal(updatedWallet.Name, createdWallet.Name)
 		s.Require().Equal(updatedWallet.Currency, createdWallet.Currency)
@@ -147,8 +162,10 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodPatch, walletIDPath, http.StatusOK, &updatedWallet, &createdWallet)
 
+		// Assert
 		s.Require().Equal(updatedWallet.UserID, createdWallet.UserID)
 		s.Require().Equal(updatedWallet.Name, createdWallet.Name)
 		s.Require().Equal(updatedWallet.Currency, createdWallet.Currency)
@@ -156,6 +173,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 }
 
 func (s *IntegrationTestSuite) TestDeleteWallet() {
+	// Arrange
 	wallet := models.Wallet{
 		WalletID: uuid.New(),
 		UserID:   uuid.New(),
@@ -167,6 +185,7 @@ func (s *IntegrationTestSuite) TestDeleteWallet() {
 		uuidString := wallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodDelete, walletIDPath, http.StatusNotFound, nil, nil)
 	})
 
@@ -182,11 +201,13 @@ func (s *IntegrationTestSuite) TestDeleteWallet() {
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
 
+		// Act
 		s.sendRequest(http.MethodDelete, walletIDPath, http.StatusOK, nil, nil)
 	})
 }
 
 func (s *IntegrationTestSuite) TestGetWallets() {
+	// Arrange
 	wallet := models.Wallet{
 		WalletID: uuid.New(),
 		UserID:   uuid.New(),
@@ -210,11 +231,15 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 
 	s.Run("empty list", func() {
 		var wallets []models.Wallet
+
+		// Act
 		s.sendRequest(http.MethodGet, walletPath, http.StatusOK, nil, &wallets)
 
+		// Assert
 		s.Require().Len(wallets, 0)
 	})
 
+	// Arrange
 	err := s.db.UpsertUser(context.Background(), existingUser)
 	s.Require().NoError(err)
 
@@ -236,8 +261,10 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 	s.Run("read successfully", func() {
 		var wallets []models.Wallet
 
+		// Act
 		s.sendRequest(http.MethodGet, walletPath, http.StatusOK, nil, &wallets)
 
+		// Assert
 		s.Require().Len(wallets, 3)
 	})
 
@@ -245,8 +272,10 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 		var wallets []models.Wallet
 		descWalletPath := walletPath + "?sorting=name&descending=true"
 
+		// Act
 		s.sendRequest(http.MethodGet, descWalletPath, http.StatusOK, nil, &wallets)
 
+		// Assert
 		s.Require().Equal(createdWallet.UserID, wallets[2].UserID)
 		s.Require().Equal(createdWallet.Name, wallets[2].Name)
 		s.Require().Equal(createdWallet.Currency, wallets[2].Currency)
@@ -264,8 +293,10 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 		var wallets []models.Wallet
 		filterWalletPath := walletPath + "?filter=rub"
 
+		// Act
 		s.sendRequest(http.MethodGet, filterWalletPath, http.StatusOK, nil, &wallets)
 
+		// Assert
 		s.Require().Len(wallets, 1)
 	})
 
@@ -273,8 +304,10 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 		var wallets []models.Wallet
 		limitWalletPath := walletPath + "?sorting=name&limit=2&offset=2"
 
+		// Act
 		s.sendRequest(http.MethodGet, limitWalletPath, http.StatusOK, nil, &wallets)
 
+		// Assert
 		s.Require().Len(wallets, 1)
 		s.Require().Equal(wallets[0], thirdCreatedWallet)
 	})
