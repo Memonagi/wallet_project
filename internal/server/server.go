@@ -29,24 +29,28 @@ type Server struct {
 	port    int
 }
 
+type Config struct {
+	Port int
+}
+
 const (
 	readHeaderTimeout = 5 * time.Second
 	gracefulTimeout   = 10 * time.Second
 	DefaultLimit      = 25
 )
 
-func New(port int, service service) *Server {
+func New(cfg Config, service service) *Server {
 	r := chi.NewRouter()
 
 	s := Server{
 		service: service,
 		//nolint:exhaustivestruct
 		server: &http.Server{
-			Addr:              fmt.Sprintf(":%d", port),
+			Addr:              fmt.Sprintf(":%d", cfg.Port),
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
-		port: port,
+		port: cfg.Port,
 	}
 
 	r.Route("/api/v1/wallets", func(r chi.Router) {

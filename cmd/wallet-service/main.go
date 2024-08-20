@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Memonagi/wallet_project/internal/config"
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	"github.com/Memonagi/wallet_project/internal/server"
@@ -16,16 +17,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	port = 8080
-	dsn  = "postgresql://user:password@localhost:5432/mydatabase"
-)
-
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.New(ctx, dsn)
+	cfg := config.New()
+
+	db, err := database.New(ctx, database.Config{Dsn: cfg.GetPostgresDSN()})
 	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
@@ -36,7 +34,7 @@ func main() {
 
 	logrus.Info("migrated successfully")
 
-	kafkaConsumer, err := consumer.New(db, "localhost:9094")
+	kafkaConsumer, err := consumer.New(db, consumer.Config{Port: cfg.GetKafkaPort()})
 	if err != nil {
 		logrus.Panicf("failed to connect to consumer: %v", err)
 	}
@@ -48,7 +46,7 @@ func main() {
 	}()
 
 	svc := service.New(db)
-	httpServer := server.New(port, svc)
+	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc)
 
 	eg, ctx := errgroup.WithContext(ctx)
 

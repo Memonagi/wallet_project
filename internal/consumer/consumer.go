@@ -19,8 +19,12 @@ type Consumer struct {
 	consumer  sarama.Consumer
 }
 
-func New(infoSaver infoSaver, address string) (*Consumer, error) {
-	consumer, err := sarama.NewConsumer([]string{address}, nil)
+type Config struct {
+	Port string
+}
+
+func New(infoSaver infoSaver, cfg Config) (*Consumer, error) {
+	consumer, err := sarama.NewConsumer([]string{cfg.Port}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating new consumer: %w", err)
 	}

@@ -17,11 +17,15 @@ type Store struct {
 	dsn string
 }
 
+type Config struct {
+	Dsn string
+}
+
 //go:embed migrations
 var migrations embed.FS
 
-func New(ctx context.Context, dsn string) (*Store, error) {
-	db, err := pgxpool.New(ctx, dsn)
+func New(ctx context.Context, cfg Config) (*Store, error) {
+	db, err := pgxpool.New(ctx, cfg.Dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -34,7 +38,7 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 
 	return &Store{
 		db:  db,
-		dsn: dsn,
+		dsn: cfg.Dsn,
 	}, nil
 }
 
