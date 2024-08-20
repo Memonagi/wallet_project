@@ -48,14 +48,14 @@ func (s *IntegrationTestSuite) SetupSuite() {
 
 	var err error
 
-	s.db, err = database.New(ctx, pgDSN)
+	s.db, err = database.New(ctx, database.Config{Dsn: pgDSN})
 	s.Require().NoError(err)
 
 	err = s.db.Migrate(migrate.Up)
 	s.Require().NoError(err)
 
 	s.service = service.New(s.db)
-	s.server = server.New(port, s.service)
+	s.server = server.New(server.Config{Port: port}, s.service)
 
 	go func() {
 		err = s.server.Run(ctx)
