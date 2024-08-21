@@ -11,6 +11,7 @@ import (
 	"github.com/Memonagi/wallet_project/internal/database"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
+	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
@@ -45,7 +46,8 @@ func main() {
 		}
 	}()
 
-	svc := service.New(db)
+	client := xrclient.New()
+	svc := service.New(db, client)
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc)
 
 	eg, ctx := errgroup.WithContext(ctx)

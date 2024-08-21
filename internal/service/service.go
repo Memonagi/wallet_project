@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/google/uuid"
@@ -14,14 +15,23 @@ type wallets interface {
 	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
 	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
+	GetCurrency(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.WalletUpdate, error)
+}
+
+type xrClient interface {
+	GetRate(ctx context.Context, from, to string) (float64, error)
 }
 
 type Service struct {
-	wallets wallets
+	wallets  wallets
+	xrClient xrClient
 }
 
-func New(wallets wallets) *Service {
-	return &Service{wallets: wallets}
+func New(wallets wallets, xrClient xrClient) *Service {
+	return &Service{
+		wallets:  wallets,
+		xrClient: xrClient,
+	}
 }
 
 func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
@@ -68,7 +78,35 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 		err           error
 	)
 
-	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
+	baseWallet, err := s.wallets.GetCurrency(ctx, walletID, wallet)
+	if err != nil {
+		return models.Wallet{}, fmt.Errorf("wallet not found: %w", err)
+	}
+
+	if baseWallet.Currency != wallet.Currency {
+		rate, err := s.xrClient.GetRate(ctx, *baseWallet.Currency, *wallet.Currency)
+		if err != nil {
+			return models.Wallet{}, fmt.Errorf("failed get rate: %w", err)
+		}
+
+		if *baseWallet.Balance == "" {
+			*baseWallet.Balance = "0"
+		}
+
+		baseBalance, err := strconv.ParseFloat(*baseWallet.Balance, 64)
+		if err != nil {
+			return models.Wallet{}, fmt.Errorf("failed parse balance: %w", err)
+		}
+
+		newBalance := baseBalance * rate
+		newBalanceStr := strconv.FormatFloat(newBalance, 'f', -1, 64)
+		baseWallet.Balance = &newBalanceStr
+		baseWallet.Currency = wallet.Currency
+	}
+
+	baseWallet.Name = wallet.Name
+
+	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, baseWallet); err != nil {
 		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 

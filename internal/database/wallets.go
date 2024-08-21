@@ -223,3 +223,20 @@ ILIKE $%d`, len(args)))
 
 	return sb.String(), args
 }
+
+func (s *Store) GetCurrency(ctx context.Context, walletID uuid.UUID,
+	wallet models.WalletUpdate,
+) (models.WalletUpdate, error) {
+	query := `SELECT currency FROM wallets WHERE id = $1 AND archived = false`
+
+	err := s.db.QueryRow(ctx, query, walletID).Scan(&wallet.Currency)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return models.WalletUpdate{}, fmt.Errorf("failed to read wallet info: %w", models.ErrWalletNotFound)
+		}
+
+		return models.WalletUpdate{}, fmt.Errorf("failed to read wallet info: %w", err)
+	}
+
+	return wallet, nil
+}

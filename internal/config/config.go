@@ -21,6 +21,7 @@ type EnvSetting struct {
 	AppPort     int    `env:"APP_PORT" env-default:"8080" env-description:"Application port"`
 	KafkaPort   string `env:"KAFKA_PORT" env-default:"localhost:9094" env-description:"Kafka port"`
 	PostgresDSN string `env:"POSTGRES_DSN" env-default:"postgresql://user:password@localhost:5432/mydatabase" env-description:"PostgreSQL DSN"` //nolint:lll
+	XRPort      int    `env:"XR_PORT" env-default:"2607" env-description:"XR port"`
 }
 
 func findConfigFile() bool {
@@ -91,4 +92,8 @@ func (c *Config) GetKafkaPort() string {
 
 func (c *Config) GetPostgresDSN() string {
 	return c.env.PostgresDSN
+}
+
+func (c *Config) GetXRPort() int {
+	return c.env.XRPort
 }

@@ -45,6 +45,7 @@ type Wallet struct {
 type WalletUpdate struct {
 	Name     *string `json:"name"`
 	Currency *string `json:"currency"`
+	Balance  *string `json:"balance,omitempty"`
 }
 
 type GetWalletsRequest struct {
@@ -55,12 +56,22 @@ type GetWalletsRequest struct {
 	Offset     int    `json:"offset,omitempty"`
 }
 
+type XRRequest struct {
+	FromCurrency string `json:"fromCurrency"`
+	ToCurrency   string `json:"toCurrency"`
+}
+
+type XRResponse struct {
+	Rate float64 `json:"rate"`
+}
+
 var (
 	errEmptyName      = errors.New("wallet name is empty")
 	errWrongCurrency  = errors.New("wallet currency is invalid")
 	ErrEmptyID        = errors.New("wallet ID is empty")
 	ErrWalletNotFound = errors.New("wallet not found")
 	ErrUserNotFound   = errors.New("user not found")
+	ErrWrongCurrency  = errors.New("currency is invalid")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},
@@ -70,6 +81,16 @@ var (
 		"CNY": {},
 		"CAD": {},
 		"AUD": {},
+	}
+	//nolint:gochecknoglobals
+	ExchangeRates = map[string]float64{
+		"USD": 1.5, //nolint:mnd
+		"EUR": 1.6, //nolint:mnd
+		"RUB": 1,
+		"JPY": 0.8, //nolint:mnd
+		"CNY": 1.2, //nolint:mnd
+		"CAD": 1.3, //nolint:mnd
+		"AUD": 1.1, //nolint:mnd
 	}
 )
 
