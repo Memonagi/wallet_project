@@ -26,6 +26,7 @@ import (
 const (
 	pgDSN      = "postgresql://user:password@localhost:5432/mydatabase"
 	port       = 5003
+	xrAddress  = "http://localhost:2607"
 	xrPort     = 2607
 	walletPath = `/api/v1/wallets`
 )
@@ -45,8 +46,8 @@ type IntegrationTestSuite struct {
 	service   *service.Service
 	server    *server.Server
 	client    *xrclient.Client
-	xrservice *xrservice.Service
-	xrserver  *xrserver.Server
+	xrService *xrservice.Service
+	xrServer  *xrserver.Server
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
@@ -61,15 +62,15 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	err = s.db.Migrate(migrate.Up)
 	s.Require().NoError(err)
 
-	s.xrservice = xrservice.New()
-	s.xrserver = xrserver.New(xrserver.Config{Port: xrPort}, s.xrservice)
+	s.xrService = xrservice.New()
+	s.xrServer = xrserver.New(xrserver.Config{Port: xrPort}, s.xrService)
 
 	go func() {
-		err = s.xrserver.Run(ctx)
+		err := s.xrServer.Run(ctx)
 		s.Require().NoError(err)
 	}()
 
-	s.client = xrclient.New()
+	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
 	s.service = service.New(s.db, s.client)
 	s.server = server.New(server.Config{Port: port}, s.service)
 

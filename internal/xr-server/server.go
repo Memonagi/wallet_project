@@ -44,7 +44,7 @@ func New(cfg Config, service service) *Server {
 		port: cfg.Port,
 	}
 
-	r.Route("/xr", func(r chi.Router) {
+	r.Route("/api/v1/xr", func(r chi.Router) {
 		r.Get("/", s.readExchangeRate)
 	})
 
@@ -53,9 +53,6 @@ func New(cfg Config, service service) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	logrus.Infof("starting xr-server on port %d", s.port)
-
-	t := time.NewTicker(time.Minute)
-	defer t.Stop()
 
 	go func() {
 		<-ctx.Done()

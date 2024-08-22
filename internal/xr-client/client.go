@@ -7,23 +7,30 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/sirupsen/logrus"
 )
 
 type Client struct {
-	Rate float64
+	address string
 }
 
-const port = 2607
-
-func New() *Client {
-	return &Client{}
+type Config struct {
+	ServerAddress string
 }
 
-var errStatus = errors.New("wrong status code")
+const (
+	route = "/api/v1/xr?from=%v&to=%v"
+)
+
+func New(cfg Config) *Client {
+	return &Client{address: cfg.ServerAddress}
+}
+
+var ErrStatus = errors.New("wrong status code")
 
 func (c *Client) GetRate(ctx context.Context, from, to string) (float64, error) {
-	address := fmt.Sprintf("http://localhost:%d/xr?from=%v&to=%v", port, from, to)
+	address := c.address + fmt.Sprintf(route, from, to)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
@@ -44,18 +51,14 @@ func (c *Client) GetRate(ctx context.Context, from, to string) (float64, error) 
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, errStatus
+		return 0, ErrStatus
 	}
 
-	var responseBody struct {
-		Rate float64 `json:"rate"`
-	}
+	var response models.XRResponse
 
-	if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return 0, fmt.Errorf("xrclient: failed to decode response: %w", err)
 	}
 
-	c.Rate = responseBody.Rate
-
-	return c.Rate, nil
+	return response.Rate, nil
 }

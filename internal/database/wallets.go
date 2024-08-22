@@ -68,7 +68,7 @@ func (s *Store) GetWallet(ctx context.Context, walletID uuid.UUID,
 }
 
 func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID,
-	wallet models.WalletUpdate,
+	wallet models.WalletUpdate, rate float64,
 ) (models.Wallet, error) {
 	var (
 		sb            strings.Builder
@@ -86,6 +86,11 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 	if wallet.Currency != nil {
 		args = append(args, wallet.Currency)
 		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
+	}
+
+	if rate != 1 {
+		args = append(args, rate)
+		sb.WriteString(fmt.Sprintf("balance = $%d * balance, ", len(args)))
 	}
 
 	if len(args) == 0 {
@@ -224,9 +229,9 @@ ILIKE $%d`, len(args)))
 	return sb.String(), args
 }
 
-func (s *Store) GetCurrency(ctx context.Context, walletID uuid.UUID,
-	wallet models.WalletUpdate,
-) (models.WalletUpdate, error) {
+func (s *Store) GetCurrency(ctx context.Context, walletID uuid.UUID) (models.WalletUpdate, error) {
+	var wallet models.WalletUpdate
+
 	query := `SELECT currency FROM wallets WHERE id = $1 AND archived = false`
 
 	err := s.db.QueryRow(ctx, query, walletID).Scan(&wallet.Currency)

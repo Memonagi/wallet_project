@@ -45,7 +45,6 @@ type Wallet struct {
 type WalletUpdate struct {
 	Name     *string `json:"name"`
 	Currency *string `json:"currency"`
-	Balance  *string `json:"balance,omitempty"`
 }
 
 type GetWalletsRequest struct {
@@ -81,16 +80,6 @@ var (
 		"CNY": {},
 		"CAD": {},
 		"AUD": {},
-	}
-	//nolint:gochecknoglobals
-	ExchangeRates = map[string]float64{
-		"USD": 1.5, //nolint:mnd
-		"EUR": 1.6, //nolint:mnd
-		"RUB": 1,
-		"JPY": 0.8, //nolint:mnd
-		"CNY": 1.2, //nolint:mnd
-		"CAD": 1.3, //nolint:mnd
-		"AUD": 1.1, //nolint:mnd
 	}
 )
 

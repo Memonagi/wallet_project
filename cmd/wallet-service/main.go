@@ -46,7 +46,7 @@ func main() {
 		}
 	}()
 
-	client := xrclient.New()
+	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
 	svc := service.New(db, client)
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc)
 
