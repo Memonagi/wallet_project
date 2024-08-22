@@ -31,17 +31,17 @@ const (
 	gracefulTimeout   = 10 * time.Second
 )
 
-func New(cfg Config, service service) *Server {
+func New(port int, service service) *Server {
 	r := chi.NewRouter()
 
 	s := Server{
 		service: service,
 		server: &http.Server{
-			Addr:              fmt.Sprintf(":%d", cfg.Port),
+			Addr:              fmt.Sprintf(":%d", port),
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
-		port: cfg.Port,
+		port: port,
 	}
 
 	r.Route("/api/v1/xr", func(r chi.Router) {

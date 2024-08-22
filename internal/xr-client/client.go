@@ -12,7 +12,7 @@ import (
 )
 
 type Client struct {
-	address string
+	cfg Config
 }
 
 type Config struct {
@@ -24,13 +24,13 @@ const (
 )
 
 func New(cfg Config) *Client {
-	return &Client{address: cfg.ServerAddress}
+	return &Client{cfg: cfg}
 }
 
 var ErrStatus = errors.New("wrong status code")
 
 func (c *Client) GetRate(ctx context.Context, from, to string) (float64, error) {
-	address := c.address + fmt.Sprintf(route, from, to)
+	address := c.cfg.ServerAddress + fmt.Sprintf(route, from, to)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {

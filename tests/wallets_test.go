@@ -339,3 +339,9 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 		s.Require().Equal(wallets[0], thirdCreatedWallet)
 	})
 }
+
+// TODO authorization
+// TODO technical debt - update is transaction
+// TODO finance transactions
+// TODO history of transactions
+// TODO metrics

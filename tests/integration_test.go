@@ -63,7 +63,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	s.xrService = xrservice.New()
-	s.xrServer = xrserver.New(xrserver.Config{Port: xrPort}, s.xrService)
+	s.xrServer = xrserver.New(xrPort, s.xrService)
 
 	go func() {
 		err := s.xrServer.Run(ctx)
