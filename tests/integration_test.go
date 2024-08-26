@@ -14,6 +14,9 @@ import (
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
+	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
+	xrserver "github.com/Memonagi/wallet_project/internal/xr-server"
+	xrservice "github.com/Memonagi/wallet_project/internal/xr-service"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
@@ -23,6 +26,8 @@ import (
 const (
 	pgDSN      = "postgresql://user:password@localhost:5432/mydatabase"
 	port       = 5003
+	xrAddress  = "http://localhost:2607"
+	xrPort     = 2607
 	walletPath = `/api/v1/wallets`
 )
 
@@ -36,10 +41,13 @@ var existingUser = models.UsersInfo{
 
 type IntegrationTestSuite struct {
 	suite.Suite
-	cancelFn context.CancelFunc
-	db       *database.Store
-	service  *service.Service
-	server   *server.Server
+	cancelFn  context.CancelFunc
+	db        *database.Store
+	service   *service.Service
+	server    *server.Server
+	client    *xrclient.Client
+	xrService *xrservice.Service
+	xrServer  *xrserver.Server
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
@@ -54,7 +62,16 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	err = s.db.Migrate(migrate.Up)
 	s.Require().NoError(err)
 
-	s.service = service.New(s.db)
+	s.xrService = xrservice.New()
+	s.xrServer = xrserver.New(xrPort, s.xrService)
+
+	go func() {
+		err := s.xrServer.Run(ctx)
+		s.Require().NoError(err)
+	}()
+
+	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
+	s.service = service.New(s.db, s.client)
 	s.server = server.New(server.Config{Port: port}, s.service)
 
 	go func() {

@@ -55,12 +55,22 @@ type GetWalletsRequest struct {
 	Offset     int    `json:"offset,omitempty"`
 }
 
+type XRRequest struct {
+	FromCurrency string `json:"fromCurrency"`
+	ToCurrency   string `json:"toCurrency"`
+}
+
+type XRResponse struct {
+	Rate float64 `json:"rate"`
+}
+
 var (
 	errEmptyName      = errors.New("wallet name is empty")
 	errWrongCurrency  = errors.New("wallet currency is invalid")
 	ErrEmptyID        = errors.New("wallet ID is empty")
 	ErrWalletNotFound = errors.New("wallet not found")
 	ErrUserNotFound   = errors.New("user not found")
+	ErrWrongCurrency  = errors.New("currency is invalid")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},

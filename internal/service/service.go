@@ -11,17 +11,26 @@ import (
 type wallets interface {
 	CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error)
 	GetWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) (models.Wallet, error)
-	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
+	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate, rate float64) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
 	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
+	GetCurrency(ctx context.Context, walletID uuid.UUID) (models.WalletUpdate, error)
+}
+
+type xrClient interface {
+	GetRate(ctx context.Context, from, to string) (float64, error)
 }
 
 type Service struct {
-	wallets wallets
+	wallets  wallets
+	xrClient xrClient
 }
 
-func New(wallets wallets) *Service {
-	return &Service{wallets: wallets}
+func New(wallets wallets, xrClient xrClient) *Service {
+	return &Service{
+		wallets:  wallets,
+		xrClient: xrClient,
+	}
 }
 
 func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet) (models.Wallet, error) {
@@ -66,9 +75,25 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID uuid.UUID,
 	var (
 		updatedWallet models.Wallet
 		err           error
+		rate          = 1.00
 	)
 
-	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, wallet); err != nil {
+	baseWallet, err := s.wallets.GetCurrency(ctx, walletID)
+	if err != nil {
+		return models.Wallet{}, fmt.Errorf("wallet not found: %w", err)
+	}
+
+	if baseWallet.Currency != wallet.Currency {
+		rate, err = s.xrClient.GetRate(ctx, *baseWallet.Currency, *wallet.Currency)
+		if err != nil {
+			return models.Wallet{}, fmt.Errorf("failed get rate: %w", err)
+		}
+	}
+
+	baseWallet.Currency = wallet.Currency
+	baseWallet.Name = wallet.Name
+
+	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, baseWallet, rate); err != nil {
 		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 

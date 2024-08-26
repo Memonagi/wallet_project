@@ -108,7 +108,34 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 			WalletID: createdWallet.WalletID,
 			UserID:   createdWallet.UserID,
 			Name:     "renamedWallet",
-			Currency: "USD",
+			Currency: createdWallet.Currency,
+		}
+		uuidString := createdWallet.WalletID.String()
+		walletIDPath := walletPath + "/" + uuidString
+
+		// Act
+		s.sendRequest(http.MethodPatch, walletIDPath, http.StatusOK, &updatedWallet, &createdWallet)
+
+		// Assert
+		s.Require().Equal(updatedWallet.UserID, createdWallet.UserID)
+		s.Require().Equal(updatedWallet.Name, createdWallet.Name)
+		s.Require().Equal(updatedWallet.Currency, createdWallet.Currency)
+	})
+
+	s.Run("currency updated successfully", func() {
+		err := s.db.UpsertUser(context.Background(), existingUser)
+		s.Require().NoError(err)
+
+		wallet.UserID = existingUser.UserID
+		createdWallet := models.Wallet{}
+
+		s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &wallet, &createdWallet)
+
+		updatedWallet := models.Wallet{
+			WalletID: createdWallet.WalletID,
+			UserID:   createdWallet.UserID,
+			Name:     createdWallet.Name,
+			Currency: "RUB",
 		}
 		uuidString := createdWallet.WalletID.String()
 		walletIDPath := walletPath + "/" + uuidString
@@ -312,3 +339,9 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 		s.Require().Equal(wallets[0], thirdCreatedWallet)
 	})
 }
+
+// TODO authorization
+// TODO technical debt - update is transaction
+// TODO finance transactions
+// TODO history of transactions
+// TODO metrics

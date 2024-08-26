@@ -67,9 +67,6 @@ func New(cfg Config, service service) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	logrus.Info("starting server on port ", s.port)
 
-	t := time.NewTicker(time.Minute)
-	defer t.Stop()
-
 	go func() {
 		<-ctx.Done()
 		logrus.Info("shutting down server on port ", s.port)
