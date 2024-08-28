@@ -9,6 +9,7 @@ import (
 	"github.com/Memonagi/wallet_project/internal/config"
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
+	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
@@ -48,7 +49,8 @@ func main() {
 
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
 	svc := service.New(db, client)
-	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc)
+	jwtClaims := jwtclaims.New()
+	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
 
 	eg, ctx := errgroup.WithContext(ctx)
 

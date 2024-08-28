@@ -1,6 +1,8 @@
 package jwtclaims_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"testing"
 	"time"
 
@@ -11,32 +13,37 @@ import (
 )
 
 func TestGenerateToken(t *testing.T) {
-	secret := "my_secret_string"
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	require.NoError(t, err)
 
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	tokenStr, err := claims.GenerateToken(secret)
+	tokenStr, err := claims.GenerateToken(privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
 }
 
 func TestValidateToken(t *testing.T) {
-	secret := "my_secret_string"
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	require.NoError(t, err)
+
+	publicKey, err := jwtclaims.ReadPublicKey()
+	require.NoError(t, err)
 
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	tokenStr, err := claims.GenerateToken(secret)
+	tokenStr, err := claims.GenerateToken(privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
+	err = newClaims.ValidateToken(tokenStr, publicKey)
 	require.NoError(t, err)
 
 	require.Equal(t, claims.UserID, newClaims.UserID)
@@ -45,43 +52,54 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestValidateInvalidSignature(t *testing.T) {
-	secret := "my_secret_string"
-	invalidSecret := "bla_bla_bla"
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	require.NoError(t, err)
+
+	randomPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	randomPublicKey := &randomPrivateKey.PublicKey
 
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	tokenStr, err := claims.GenerateToken(secret)
+	tokenStr, err := claims.GenerateToken(privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, invalidSecret)
+	err = newClaims.ValidateToken(tokenStr, randomPublicKey)
 	require.Error(t, err, "Must return error with invalid signature")
 }
 
 func TestValidateInvalidSignatureMethod(t *testing.T) {
-	secret := "my_secret_string"
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	require.NoError(t, err)
+
+	publicKey, err := jwtclaims.ReadPublicKey()
+	require.NoError(t, err)
 
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS384, claims)
-	tokenStr, err := token.SignedString([]byte(secret))
+	token := jwt.NewWithClaims(jwt.SigningMethodRS384, claims)
+	tokenStr, err := token.SignedString(privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
+	err = newClaims.ValidateToken(tokenStr, publicKey)
 	require.Error(t, err, "Must return error with invalid signature method")
 }
 
 func TestValidateExpiredToken(t *testing.T) {
-	secret := "my_secret_string"
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	require.NoError(t, err)
+
+	publicKey, err := jwtclaims.ReadPublicKey()
+	require.NoError(t, err)
 
 	claims := &jwtclaims.Claims{
 		UserID: uuid.New(),
@@ -93,11 +111,11 @@ func TestValidateExpiredToken(t *testing.T) {
 		},
 	}
 
-	tokenStr, err := claims.GenerateToken(secret)
+	tokenStr, err := claims.GenerateToken(privateKey)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
+	err = newClaims.ValidateToken(tokenStr, publicKey)
 	require.Error(t, err, "Must return error with expired token")
 }

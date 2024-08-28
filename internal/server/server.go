@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ type service interface {
 type Server struct {
 	service service
 	server  *http.Server
+	key     *rsa.PublicKey
 	port    int
 }
 
@@ -39,7 +41,7 @@ const (
 	DefaultLimit      = 25
 )
 
-func New(cfg Config, service service) *Server {
+func New(cfg Config, service service, key *rsa.PublicKey) *Server {
 	r := chi.NewRouter()
 
 	s := Server{
@@ -50,10 +52,13 @@ func New(cfg Config, service service) *Server {
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
+		key:  key,
 		port: cfg.Port,
 	}
 
 	r.Route("/api/v1/wallets", func(r chi.Router) {
+		r.Use(s.JWTCheck)
+
 		r.Post("/", s.createWallet)
 		r.Get("/{id}", s.getWallet)
 		r.Patch("/{id}", s.updateWallet)
@@ -99,6 +104,8 @@ func (s *Server) errorResponse(w http.ResponseWriter, errorText string, err erro
 		statusCode = http.StatusNotFound
 	case errors.Is(err, models.ErrEmptyID):
 		statusCode = http.StatusNotFound
+	case errors.Is(err, models.ErrInvalidToken):
+		statusCode = http.StatusUnauthorized
 	}
 
 	errResp := fmt.Errorf("%s: %w", errorText, err).Error()

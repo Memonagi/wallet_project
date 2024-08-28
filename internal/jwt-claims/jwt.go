@@ -1,10 +1,12 @@
 package jwtclaims
 
 import (
-	"errors"
+	"crypto/rsa"
+	_ "embed"
 	"fmt"
 	"time"
 
+	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -18,10 +20,11 @@ type Claims struct {
 
 const hours = 24
 
-var (
-	ErrInvalidToken         = errors.New("invalid token")
-	ErrInvalidSigningMethod = errors.New("invalid signing method")
-)
+//go:embed keys/private_key.pem
+var privateKeyData []byte
+
+//go:embed keys/public_key.pem
+var publicKeyData []byte
 
 func New() *Claims {
 	tokenTime := time.Now().Add(hours * time.Hour)
@@ -34,10 +37,28 @@ func New() *Claims {
 	}
 }
 
-func (c *Claims) GenerateToken(secret string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+func ReadPrivateKey() (*rsa.PrivateKey, error) {
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private key: %w", err)
+	}
 
-	tokenStr, err := token.SignedString([]byte(secret))
+	return privateKey, nil
+}
+
+func ReadPublicKey() (*rsa.PublicKey, error) {
+	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(publicKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing public key: %w", err)
+	}
+
+	return publicKey, nil
+}
+
+func (c *Claims) GenerateToken(secret *rsa.PrivateKey) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, c)
+
+	tokenStr, err := token.SignedString(secret)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -45,21 +66,30 @@ func (c *Claims) GenerateToken(secret string) (string, error) {
 	return tokenStr, nil
 }
 
-func (c *Claims) ValidateToken(tokenStr, secret string) error {
+func (c *Claims) ValidateToken(tokenStr string, secret *rsa.PublicKey) error {
 	token, err := jwt.ParseWithClaims(tokenStr, c, func(token *jwt.Token) (interface{}, error) {
-		if method, ok := token.Method.(*jwt.SigningMethodHMAC); !ok || method != jwt.SigningMethodHS256 {
-			return nil, ErrInvalidSigningMethod
+		if method, ok := token.Method.(*jwt.SigningMethodRSA); !ok || method != jwt.SigningMethodRS256 {
+			return nil, models.ErrInvalidSigningMethod
 		}
 
-		return []byte(secret), nil
+		return secret, nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %w", err)
 	}
 
 	if !token.Valid {
-		return ErrInvalidToken
+		return models.ErrInvalidToken
 	}
 
 	return nil
+}
+
+func (c *Claims) GetPublicKey() *rsa.PublicKey {
+	key, err := ReadPublicKey()
+	if err != nil {
+		return nil
+	}
+
+	return key
 }
