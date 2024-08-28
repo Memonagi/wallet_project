@@ -84,7 +84,7 @@ func (s *Store) Migrate(direction migrate.MigrationDirection) error {
 	return nil
 }
 
-func (s *Store) UpsertUser(ctx context.Context, users models.UsersInfo) error {
+func (s *Store) UpsertUser(ctx context.Context, users models.User) error {
 	query := `INSERT INTO users (id, status, archived, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (id) DO UPDATE SET 

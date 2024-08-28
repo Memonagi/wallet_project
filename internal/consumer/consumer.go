@@ -11,7 +11,7 @@ import (
 )
 
 type infoSaver interface {
-	UpsertUser(ctx context.Context, users models.UsersInfo) error
+	UpsertUser(ctx context.Context, users models.User) error
 }
 
 type Consumer struct {
@@ -54,7 +54,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case msg := <-partConsumer.Messages():
-			var users models.UsersInfo
+			var users models.User
 
 			if err := json.Unmarshal(msg.Value, &users); err != nil {
 				return fmt.Errorf("error unmarshalling users: %w", err)

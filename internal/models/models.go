@@ -23,7 +23,7 @@ type UserExternal struct {
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
-type UsersInfo struct {
+type User struct {
 	UserID    uuid.UUID `json:"userId"`
 	Status    string    `json:"status"`
 	Archived  bool      `json:"archived"`
@@ -55,6 +55,12 @@ type GetWalletsRequest struct {
 	Offset     int    `json:"offset,omitempty"`
 }
 
+type UserInfo struct {
+	UserID uuid.UUID `json:"userId"`
+	Email  string    `json:"email"`
+	Role   string    `json:"role"`
+}
+
 type XRRequest struct {
 	FromCurrency string `json:"fromCurrency"`
 	ToCurrency   string `json:"toCurrency"`
@@ -65,12 +71,14 @@ type XRResponse struct {
 }
 
 var (
-	errEmptyName      = errors.New("wallet name is empty")
-	errWrongCurrency  = errors.New("wallet currency is invalid")
-	ErrEmptyID        = errors.New("wallet ID is empty")
-	ErrWalletNotFound = errors.New("wallet not found")
-	ErrUserNotFound   = errors.New("user not found")
-	ErrWrongCurrency  = errors.New("currency is invalid")
+	errEmptyName            = errors.New("wallet name is empty")
+	errWrongCurrency        = errors.New("wallet currency is invalid")
+	ErrEmptyID              = errors.New("wallet ID is empty")
+	ErrWalletNotFound       = errors.New("wallet not found")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrWrongCurrency        = errors.New("currency is invalid")
+	ErrInvalidToken         = errors.New("invalid token")
+	ErrInvalidSigningMethod = errors.New("invalid signing method")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},

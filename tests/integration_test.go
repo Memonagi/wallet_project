@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/Memonagi/wallet_project/internal/database"
+	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
 	xrserver "github.com/Memonagi/wallet_project/internal/xr-server"
 	xrservice "github.com/Memonagi/wallet_project/internal/xr-service"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
@@ -31,7 +33,7 @@ const (
 	walletPath = `/api/v1/wallets`
 )
 
-var existingUser = models.UsersInfo{
+var existingUser = models.User{
 	UserID:    uuid.New(),
 	Status:    "active",
 	Archived:  false,
@@ -48,6 +50,7 @@ type IntegrationTestSuite struct {
 	client    *xrclient.Client
 	xrService *xrservice.Service
 	xrServer  *xrserver.Server
+	jwtClaims *jwtclaims.Claims
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
@@ -72,7 +75,8 @@ func (s *IntegrationTestSuite) SetupSuite() {
 
 	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
 	s.service = service.New(s.db, s.client)
-	s.server = server.New(server.Config{Port: port}, s.service)
+	s.jwtClaims = jwtclaims.New()
+	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey())
 
 	go func() {
 		err = s.server.Run(ctx)
@@ -103,6 +107,9 @@ func (s *IntegrationTestSuite) sendRequest(method, path string, status int, enti
 		fmt.Sprintf("http://localhost:%d%s", port, path), bytes.NewReader(body))
 	s.Require().NoError(err)
 
+	token := s.getToken(existingUser)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	client := http.Client{}
 
 	resp, err := client.Do(req)
@@ -124,4 +131,22 @@ func (s *IntegrationTestSuite) sendRequest(method, path string, status int, enti
 
 	err = json.Unmarshal(respBody, result)
 	s.Require().NoError(err)
+}
+
+func (s *IntegrationTestSuite) getToken(user models.User) string {
+	claims := jwtclaims.Claims{
+		UserID: user.UserID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	privateKey, err := jwtclaims.ReadPrivateKey()
+	s.Require().NoError(err)
+
+	token, err := claims.GenerateToken(privateKey)
+	s.Require().NoError(err)
+
+	return token
 }

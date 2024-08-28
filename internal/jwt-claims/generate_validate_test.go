@@ -1,6 +1,9 @@
 package jwtclaims_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
 
@@ -10,79 +13,91 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateToken(t *testing.T) {
-	secret := "my_secret_string"
-
-	claims := jwtclaims.New()
-	claims.UserID = uuid.New()
-	claims.Email = "test@yandex.ru"
-	claims.Role = "moderator"
-
-	tokenStr, err := claims.GenerateToken(secret)
-	require.NoError(t, err)
-	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
+type JWTTestSuite struct {
+	suite.Suite
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
 }
 
-func TestValidateToken(t *testing.T) {
-	secret := "my_secret_string"
+func (s *JWTTestSuite) SetupSuite() {
+	var err error
 
+	s.privateKey, err = jwtclaims.ReadPrivateKey()
+	s.Require().NoError(err)
+
+	s.publicKey, err = jwtclaims.ReadPublicKey()
+	s.Require().NoError(err)
+}
+
+func TestJWTSetupSuite(t *testing.T) {
+	suite.Run(t, new(JWTTestSuite))
+}
+
+func (s *JWTTestSuite) TestGenerateToken() {
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	tokenStr, err := claims.GenerateToken(secret)
-	require.NoError(t, err)
-	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
+	tokenStr, err := claims.GenerateToken(s.privateKey)
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), tokenStr, "tokenStr should not be empty")
+}
+
+func (s *JWTTestSuite) TestValidateToken() {
+	claims := jwtclaims.New()
+	claims.UserID = uuid.New()
+	claims.Email = "test@yandex.ru"
+	claims.Role = "moderator"
+
+	tokenStr, err := claims.GenerateToken(s.privateKey)
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
-	require.NoError(t, err)
+	err = newClaims.ValidateToken(tokenStr, s.publicKey)
+	require.NoError(s.T(), err)
 
-	require.Equal(t, claims.UserID, newClaims.UserID)
-	require.Equal(t, claims.Email, newClaims.Email)
-	require.Equal(t, claims.Role, newClaims.Role)
+	require.Equal(s.T(), claims.UserID, newClaims.UserID)
+	require.Equal(s.T(), claims.Email, newClaims.Email)
+	require.Equal(s.T(), claims.Role, newClaims.Role)
 }
 
-func TestValidateInvalidSignature(t *testing.T) {
-	secret := "my_secret_string"
-	invalidSecret := "bla_bla_bla"
+func (s *JWTTestSuite) TestValidateInvalidSignature() {
+	randomPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	randomPublicKey := &randomPrivateKey.PublicKey
 
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	tokenStr, err := claims.GenerateToken(secret)
-	require.NoError(t, err)
-	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
+	tokenStr, err := claims.GenerateToken(s.privateKey)
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, invalidSecret)
-	require.Error(t, err, "Must return error with invalid signature")
+	err = newClaims.ValidateToken(tokenStr, randomPublicKey)
+	require.Error(s.T(), err, "Must return error with invalid signature")
 }
 
-func TestValidateInvalidSignatureMethod(t *testing.T) {
-	secret := "my_secret_string"
-
+func (s *JWTTestSuite) TestValidateInvalidSignatureMethod() {
 	claims := jwtclaims.New()
 	claims.UserID = uuid.New()
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS384, claims)
-	tokenStr, err := token.SignedString([]byte(secret))
-	require.NoError(t, err)
-	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
+	token := jwt.NewWithClaims(jwt.SigningMethodRS384, claims)
+	tokenStr, err := token.SignedString(s.privateKey)
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
-	require.Error(t, err, "Must return error with invalid signature method")
+	err = newClaims.ValidateToken(tokenStr, s.publicKey)
+	require.Error(s.T(), err, "Must return error with invalid signature method")
 }
 
-func TestValidateExpiredToken(t *testing.T) {
-	secret := "my_secret_string"
-
+func (s *JWTTestSuite) TestValidateExpiredToken() {
 	claims := &jwtclaims.Claims{
 		UserID: uuid.New(),
 		Email:  "test@yandex.ru",
@@ -93,11 +108,11 @@ func TestValidateExpiredToken(t *testing.T) {
 		},
 	}
 
-	tokenStr, err := claims.GenerateToken(secret)
-	require.NoError(t, err)
-	require.NotEmpty(t, tokenStr, "tokenStr should not be empty")
+	tokenStr, err := claims.GenerateToken(s.privateKey)
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), tokenStr, "tokenStr should not be empty")
 
 	newClaims := &jwtclaims.Claims{}
-	err = newClaims.ValidateToken(tokenStr, secret)
-	require.Error(t, err, "Must return error with expired token")
+	err = newClaims.ValidateToken(tokenStr, s.publicKey)
+	require.Error(s.T(), err, "Must return error with expired token")
 }
