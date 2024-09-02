@@ -3,7 +3,6 @@ package jwtclaims_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 type JWTTestSuite struct {

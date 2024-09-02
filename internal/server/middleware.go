@@ -9,9 +9,15 @@ import (
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type contextKey string
+
+const (
+	ctxKey    contextKey = "ctxKey"
+	roleAdmin string     = "admin"
+)
 
 func (s *Server) JWTCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,9 +68,21 @@ func (s *Server) JWTCheck(next http.Handler) http.Handler {
 			Role:   claims.Role,
 		}
 
-		var ctxKey contextKey = "userInfo"
-
 		r = r.WithContext(context.WithValue(r.Context(), ctxKey, userInfo))
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) getFromContext(ctx context.Context) models.UserInfo {
+	userInfo, _ := ctx.Value(ctxKey).(models.UserInfo)
+
+	return userInfo
+}
+
+func (s *Server) hasAccessToWallet(userInfo models.UserInfo, walletOwnerID uuid.UUID) error {
+	if userInfo.Role != roleAdmin && userInfo.UserID != walletOwnerID {
+		return models.ErrWalletNotFound
+	}
+
+	return nil
 }

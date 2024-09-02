@@ -148,6 +148,10 @@ func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userInfo := s.getFromContext(r.Context())
+
+	wallet.UserID = userInfo.UserID
+
 	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
 		s.errorResponse(w, "error creating wallet", err)
 
@@ -167,9 +171,17 @@ func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userInfo := s.getFromContext(r.Context())
+
 	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
+
+		return
+	}
+
+	if err = s.hasAccessToWallet(userInfo, walletInfo.UserID); err != nil {
+		s.errorResponse(w, "error access denied", err)
 
 		return
 	}
@@ -183,6 +195,21 @@ func (s *Server) updateWallet(w http.ResponseWriter, r *http.Request) {
 	uuidTypeID, err := uuid.Parse(id)
 	if err != nil {
 		s.errorResponse(w, "error parsing uuid", err)
+
+		return
+	}
+
+	userInfo := s.getFromContext(r.Context())
+
+	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	if err != nil {
+		s.errorResponse(w, "error reading wallet", err)
+
+		return
+	}
+
+	if err = s.hasAccessToWallet(userInfo, walletInfo.UserID); err != nil {
+		s.errorResponse(w, "error access denied", err)
 
 		return
 	}
@@ -215,6 +242,21 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userInfo := s.getFromContext(r.Context())
+
+	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	if err != nil {
+		s.errorResponse(w, "error reading wallet", err)
+
+		return
+	}
+
+	if err = s.hasAccessToWallet(userInfo, walletInfo.UserID); err != nil {
+		s.errorResponse(w, "error access denied", err)
+
+		return
+	}
+
 	if err := s.service.DeleteWallet(r.Context(), uuidTypeID); err != nil {
 		s.errorResponse(w, "error deleting wallet", err)
 
@@ -227,6 +269,8 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
 	request := parseGetWalletsRequest(r)
 
+	userInfo := s.getFromContext(r.Context())
+
 	wallets, err := s.service.GetWallets(r.Context(), request)
 	if err != nil {
 		s.errorResponse(w, "error getting wallets", err)
@@ -234,7 +278,15 @@ func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.okResponse(w, http.StatusOK, wallets)
+	var usersWallets []models.Wallet
+
+	for _, wallet := range wallets {
+		if wallet.UserID == userInfo.UserID {
+			usersWallets = append(usersWallets, wallet)
+		}
+	}
+
+	s.okResponse(w, http.StatusOK, usersWallets)
 }
 
 func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
