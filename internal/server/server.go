@@ -21,7 +21,7 @@ type service interface {
 	GetWallet(ctx context.Context, walletID uuid.UUID) (models.Wallet, error)
 	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
-	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
+	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID uuid.UUID) ([]models.Wallet, error)
 }
 
 type Server struct {
@@ -148,11 +148,14 @@ func (s *Server) createWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userInfo := s.getFromContext(r.Context())
+	ctx := r.Context()
+	userInfo := s.getFromContext(ctx)
 
-	wallet.UserID = userInfo.UserID
+	if err := s.hasAccessToWallet(userInfo, wallet.UserID); err != nil {
+		s.errorResponse(w, "error access denied", err)
+	}
 
-	if newWallet, err = s.service.CreateWallet(r.Context(), wallet); err != nil {
+	if newWallet, err = s.service.CreateWallet(ctx, wallet); err != nil {
 		s.errorResponse(w, "error creating wallet", err)
 
 		return
@@ -171,14 +174,18 @@ func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userInfo := s.getFromContext(r.Context())
+	ctx := r.Context()
+	userInfo := s.getFromContext(ctx)
 
-	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	walletInfo, err := s.service.GetWallet(ctx, uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
 
 		return
 	}
+
+	logrus.Info("user ID:             ", userInfo.UserID)
+	logrus.Info("user ID from wallet: ", walletInfo.UserID)
 
 	if err = s.hasAccessToWallet(userInfo, walletInfo.UserID); err != nil {
 		s.errorResponse(w, "error access denied", err)
@@ -199,9 +206,10 @@ func (s *Server) updateWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userInfo := s.getFromContext(r.Context())
+	ctx := r.Context()
+	userInfo := s.getFromContext(ctx)
 
-	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	walletInfo, err := s.service.GetWallet(ctx, uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
 
@@ -222,7 +230,7 @@ func (s *Server) updateWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedWallet, err := s.service.UpdateWallet(r.Context(), uuidTypeID, wallet)
+	updatedWallet, err := s.service.UpdateWallet(ctx, uuidTypeID, wallet)
 	if err != nil {
 		s.errorResponse(w, "error updating wallet", err)
 
@@ -242,9 +250,10 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userInfo := s.getFromContext(r.Context())
+	ctx := r.Context()
+	userInfo := s.getFromContext(ctx)
 
-	walletInfo, err := s.service.GetWallet(r.Context(), uuidTypeID)
+	walletInfo, err := s.service.GetWallet(ctx, uuidTypeID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
 
@@ -257,7 +266,7 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.service.DeleteWallet(r.Context(), uuidTypeID); err != nil {
+	if err := s.service.DeleteWallet(ctx, uuidTypeID); err != nil {
 		s.errorResponse(w, "error deleting wallet", err)
 
 		return
@@ -268,25 +277,17 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
 	request := parseGetWalletsRequest(r)
+	ctx := r.Context()
+	userInfo := s.getFromContext(ctx)
 
-	userInfo := s.getFromContext(r.Context())
-
-	wallets, err := s.service.GetWallets(r.Context(), request)
+	wallets, err := s.service.GetWallets(ctx, request, userInfo.UserID)
 	if err != nil {
 		s.errorResponse(w, "error getting wallets", err)
 
 		return
 	}
 
-	var usersWallets []models.Wallet
-
-	for _, wallet := range wallets {
-		if wallet.UserID == userInfo.UserID {
-			usersWallets = append(usersWallets, wallet)
-		}
-	}
-
-	s.okResponse(w, http.StatusOK, usersWallets)
+	s.okResponse(w, http.StatusOK, wallets)
 }
 
 func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
