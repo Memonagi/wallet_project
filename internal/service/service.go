@@ -13,7 +13,7 @@ type wallets interface {
 	GetWallet(ctx context.Context, walletID uuid.UUID, wallet models.Wallet) (models.Wallet, error)
 	UpdateWallet(ctx context.Context, walletID uuid.UUID, wallet models.WalletUpdate, rate float64) (models.Wallet, error)
 	DeleteWallet(ctx context.Context, walletID uuid.UUID) error
-	GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error)
+	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID uuid.UUID) ([]models.Wallet, error)
 	GetCurrency(ctx context.Context, walletID uuid.UUID) (models.WalletUpdate, error)
 }
 
@@ -112,8 +112,10 @@ func (s *Service) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
 	return nil
 }
 
-func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error) {
-	wallets, err := s.wallets.GetWallets(ctx, request)
+func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsRequest,
+	userID uuid.UUID,
+) ([]models.Wallet, error) {
+	wallets, err := s.wallets.GetWallets(ctx, request, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed get all wallets: %w", err)
 	}

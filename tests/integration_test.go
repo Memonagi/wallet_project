@@ -99,7 +99,7 @@ func TestIntegrationSetupSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationTestSuite))
 }
 
-func (s *IntegrationTestSuite) sendRequest(method, path string, status int, entity, result any) {
+func (s *IntegrationTestSuite) sendRequest(method, path string, status int, entity, result any, user models.User) {
 	body, err := json.Marshal(entity)
 	s.Require().NoError(err)
 
@@ -107,7 +107,7 @@ func (s *IntegrationTestSuite) sendRequest(method, path string, status int, enti
 		fmt.Sprintf("http://localhost:%d%s", port, path), bytes.NewReader(body))
 	s.Require().NoError(err)
 
-	token := s.getToken(existingUser)
+	token := s.getToken(user)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := http.Client{}

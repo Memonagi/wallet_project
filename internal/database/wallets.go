@@ -138,14 +138,16 @@ func (s *Store) DeleteWallet(ctx context.Context, walletID uuid.UUID) error {
 	return nil
 }
 
-func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest) ([]models.Wallet, error) {
+func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest,
+	userID uuid.UUID,
+) ([]models.Wallet, error) {
 	var (
 		wallets []models.Wallet
 		rows    pgx.Rows
 		err     error
 	)
 
-	query, args := s.getWalletsQuery(request)
+	query, args := s.getWalletsQuery(request, userID)
 	if rows, err = s.db.Query(ctx, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to get wallets: %w", err)
 	}
@@ -180,7 +182,7 @@ func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest
 	return wallets, nil
 }
 
-func (s *Store) getWalletsQuery(request models.GetWalletsRequest) (string, []any) {
+func (s *Store) getWalletsQuery(request models.GetWalletsRequest, userID uuid.UUID) (string, []any) {
 	var (
 		sb             strings.Builder
 		args           []any
@@ -195,6 +197,9 @@ func (s *Store) getWalletsQuery(request models.GetWalletsRequest) (string, []any
 	)
 
 	sb.WriteString("SELECT * FROM wallets WHERE archived = false")
+
+	args = append(args, userID)
+	sb.WriteString(fmt.Sprintf(` AND user_id = $%d`, len(args)))
 
 	if request.Filter != "" {
 		args = append(args, "%"+request.Filter+"%")
