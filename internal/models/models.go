@@ -36,7 +36,7 @@ type Wallet struct {
 	UserID    uuid.UUID `json:"userId"`
 	Name      string    `json:"name"`
 	Currency  string    `json:"currency"`
-	Balance   string    `json:"balance"`
+	Balance   float64   `json:"balance"`
 	Archived  bool      `json:"archived"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -70,6 +70,14 @@ type XRResponse struct {
 	Rate float64 `json:"rate"`
 }
 
+type Transaction struct {
+	ID             uuid.UUID `json:"id"`
+	FirstWalletID  uuid.UUID `json:"firstWallet"`
+	SecondWalletID uuid.UUID `json:"secondWallet"`
+	Money          float64   `json:"money"`
+	Currency       string    `json:"currency"`
+}
+
 var (
 	errEmptyName            = errors.New("wallet name is empty")
 	errWrongCurrency        = errors.New("wallet currency is invalid")
@@ -79,6 +87,10 @@ var (
 	ErrWrongCurrency        = errors.New("currency is invalid")
 	ErrInvalidToken         = errors.New("invalid token")
 	ErrInvalidSigningMethod = errors.New("invalid signing method")
+	ErrInsufficientFunds    = errors.New("insufficient funds")
+	ErrWrongMoney           = errors.New("zero or negative amount of money")
+	ErrUserID               = errors.New("user ID is empty")
+	ErrWrongUserID          = errors.New("user is not the owner of the wallet")
 	//nolint:gochecknoglobals
 	currencies = map[string]struct{}{
 		"USD": {},
@@ -110,6 +122,24 @@ func (u *WalletUpdate) Validate() error {
 	}
 
 	_, ok := currencies[strings.ToUpper(*u.Currency)]
+	if !ok {
+		return errWrongCurrency
+	}
+
+	return nil
+}
+
+func (t *Transaction) Validate() error {
+	switch {
+	case t.Money == 0:
+		return ErrWrongMoney
+	case t.Money < 0:
+		return ErrWrongMoney
+	case t.FirstWalletID == uuid.Nil:
+		return ErrWalletNotFound
+	}
+
+	_, ok := currencies[strings.ToUpper(t.Currency)]
 	if !ok {
 		return errWrongCurrency
 	}

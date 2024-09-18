@@ -56,7 +56,7 @@ func (c *Client) GetRate(ctx context.Context, from, to string) (float64, error) 
 
 	var response models.XRResponse
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return 0, fmt.Errorf("xrclient: failed to decode response: %w", err)
 	}
 

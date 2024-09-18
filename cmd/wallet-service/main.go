@@ -12,7 +12,7 @@ import (
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
-	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
+	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
