@@ -72,15 +72,16 @@ type XRResponse struct {
 
 type Transaction struct {
 	ID             uuid.UUID `json:"id"`
+	Name           string    `json:"name"`
 	FirstWalletID  uuid.UUID `json:"firstWallet"`
 	SecondWalletID uuid.UUID `json:"secondWallet"`
 	Money          float64   `json:"money"`
 	Currency       string    `json:"currency"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 var (
-	errEmptyName            = errors.New("wallet name is empty")
-	errWrongCurrency        = errors.New("wallet currency is invalid")
+	ErrEmptyName            = errors.New("wallet name is empty")
 	ErrEmptyID              = errors.New("wallet ID is empty")
 	ErrWalletNotFound       = errors.New("wallet not found")
 	ErrUserNotFound         = errors.New("user not found")
@@ -105,12 +106,12 @@ var (
 
 func (w *Wallet) Validate() error {
 	if w.Name == "" {
-		return errEmptyName
+		return ErrEmptyName
 	}
 
 	_, ok := currencies[strings.ToUpper(w.Currency)]
 	if !ok {
-		return errWrongCurrency
+		return ErrWrongCurrency
 	}
 
 	return nil
@@ -118,12 +119,12 @@ func (w *Wallet) Validate() error {
 
 func (u *WalletUpdate) Validate() error {
 	if *u.Name == "" {
-		return errEmptyName
+		return ErrEmptyName
 	}
 
 	_, ok := currencies[strings.ToUpper(*u.Currency)]
 	if !ok {
-		return errWrongCurrency
+		return ErrWrongCurrency
 	}
 
 	return nil
@@ -141,7 +142,7 @@ func (t *Transaction) Validate() error {
 
 	_, ok := currencies[strings.ToUpper(t.Currency)]
 	if !ok {
-		return errWrongCurrency
+		return ErrWrongCurrency
 	}
 
 	return nil

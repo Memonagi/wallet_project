@@ -877,8 +877,6 @@ func (s *IntegrationTestSuite) TestTransfer() {
 	})
 }
 
-// TODO technical debt - update is transaction
-// TODO finance transactions
-// TODO history of transactions
 // TODO metrics
 // TODO id
+// TODO worker

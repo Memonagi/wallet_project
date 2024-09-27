@@ -86,11 +86,12 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
 
 	var (
 		updatedWallet models.Wallet
+		baseWallet    models.WalletUpdate
 		err           error
 		rate          = 1.00
 	)
 
-	baseWallet, err := s.wallets.GetCurrency(ctx, walletID)
+	baseWallet, err = s.wallets.GetCurrency(ctx, walletID)
 	if err != nil {
 		return models.Wallet{}, fmt.Errorf("wallet not found: %w", err)
 	}

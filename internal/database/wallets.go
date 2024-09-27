@@ -73,41 +73,36 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
 	wallet models.WalletUpdate, rate float64,
 ) (models.Wallet, error) {
 	var (
-		sb            strings.Builder
+		query         string
 		args          []any
 		updatedWallet = models.Wallet{}
 	)
 
-	sb.WriteString("UPDATE wallets SET ")
-
-	if wallet.Name != nil {
-		args = append(args, wallet.Name)
-		sb.WriteString(fmt.Sprintf("name = $%d, ", len(args)))
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return models.Wallet{}, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	if wallet.Currency != nil {
-		args = append(args, wallet.Currency)
-		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
+	defer func() {
+		if err = tx.Rollback(ctx); err != nil && errors.Is(err, pgx.ErrTxClosed) {
+			logrus.Warnf("failed to rollback transaction: %v", err)
+		}
+	}()
+
+	var baseWallet models.Wallet
+
+	baseWallet, err = s.getWalletTx(ctx, walletID, userID, tx)
+	if err != nil {
+		return models.Wallet{}, fmt.Errorf("failed to get wallet: %w", err)
 	}
 
-	if rate != 1 {
-		args = append(args, rate)
-		sb.WriteString(fmt.Sprintf("balance = $%d * balance, ", len(args)))
-	}
+	query, args = s.updateQuery(wallet, baseWallet, rate, walletID, userID)
 
 	if len(args) == 0 {
 		return s.GetWallet(ctx, walletID, userID, updatedWallet)
 	}
 
-	args = append(args, walletID, userID)
-	sb.WriteString(fmt.Sprintf(`updated_at = NOW() 
-WHERE id = $%d AND user_id = $%d AND archived = false`, len(args)-1, len(args)))
-
-	sb.WriteString(" RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at")
-
-	query := sb.String()
-
-	err := s.db.QueryRow(ctx, query, args...).Scan(
+	err = tx.QueryRow(ctx, query, args...).Scan(
 		&updatedWallet.WalletID,
 		&updatedWallet.UserID,
 		&updatedWallet.Name,
@@ -124,7 +119,46 @@ WHERE id = $%d AND user_id = $%d AND archived = false`, len(args)-1, len(args)))
 		return models.Wallet{}, fmt.Errorf("failed to update wallet info: %w", err)
 	}
 
+	err = tx.Commit(ctx)
+	if err != nil {
+		return models.Wallet{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return updatedWallet, nil
+}
+
+func (s *Store) updateQuery(wallet models.WalletUpdate, baseWallet models.Wallet, rate float64, walletID,
+	userID uuid.UUID,
+) (string, []any) {
+	var (
+		sb   strings.Builder
+		args []any
+	)
+
+	sb.WriteString("UPDATE wallets SET ")
+
+	if wallet.Name != nil {
+		args = append(args, wallet.Name)
+		sb.WriteString(fmt.Sprintf("name = $%d, ", len(args)))
+	}
+
+	if wallet.Currency != nil {
+		args = append(args, wallet.Currency)
+		sb.WriteString(fmt.Sprintf("currency = $%d, ", len(args)))
+	}
+
+	if baseWallet.Currency != *wallet.Currency {
+		args = append(args, rate)
+		sb.WriteString(fmt.Sprintf("balance = $%d * balance, ", len(args)))
+	}
+
+	args = append(args, walletID, userID)
+	sb.WriteString(fmt.Sprintf(`updated_at = NOW() 
+WHERE id = $%d AND user_id = $%d AND archived = false`, len(args)-1, len(args)))
+
+	sb.WriteString(" RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at")
+
+	return sb.String(), args
 }
 
 func (s *Store) DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) error {
@@ -174,7 +208,7 @@ func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest
 		wallets = append(wallets, wallet)
 	}
 
-	if err := rows.Err(); err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to get wallets: %w", err)
 	}
 
@@ -255,13 +289,13 @@ func (s *Store) GetCurrency(ctx context.Context, walletID uuid.UUID) (models.Wal
 	return wallet, nil
 }
 
-func (s *Store) getWalletTx(ctx context.Context, walletID, userID uuid.UUID) (models.Wallet, error) {
+func (s *Store) getWalletTx(ctx context.Context, walletID, userID uuid.UUID, dbTx pgx.Tx) (models.Wallet, error) {
 	var wallet models.Wallet
 
 	query := `SELECT id, user_id, name, currency, balance, archived, created_at, updated_at 
 FROM wallets WHERE id = $1 AND user_id = $2 AND archived = false FOR UPDATE `
 
-	err := s.db.QueryRow(ctx, query, walletID, userID).Scan(
+	err := dbTx.QueryRow(ctx, query, walletID, userID).Scan(
 		&wallet.WalletID,
 		&wallet.UserID,
 		&wallet.Name,
@@ -281,6 +315,37 @@ FROM wallets WHERE id = $1 AND user_id = $2 AND archived = false FOR UPDATE `
 	return wallet, nil
 }
 
+func (s *Store) createTx(ctx context.Context, transaction models.Transaction, dbTx pgx.Tx) error {
+	query := `INSERT INTO transactions 
+    (id, name, first_wallet, second_wallet, currency, money) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+
+	args := []any{
+		uuid.New(),
+		transaction.Name,
+		transaction.FirstWalletID,
+		nil,
+		transaction.Currency,
+		transaction.Money,
+	}
+
+	if transaction.SecondWalletID != uuid.Nil {
+		args[3] = transaction.SecondWalletID
+	}
+
+	err := dbTx.QueryRow(ctx, query, args...).Scan(&transaction.ID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
+			return models.ErrWalletNotFound
+		}
+
+		return fmt.Errorf("failed to save history of transaction in database: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Store) Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -295,7 +360,7 @@ func (s *Store) Deposit(ctx context.Context, userID uuid.UUID, transaction model
 
 	var wallet models.Wallet
 
-	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID)
+	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID, tx)
 	if err != nil {
 		return fmt.Errorf("failed to get wallet: %w", err)
 	}
@@ -316,6 +381,12 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 		return models.ErrWalletNotFound
 	}
 
+	transaction.Name = "deposit"
+
+	if err = s.createTx(ctx, transaction, tx); err != nil {
+		return fmt.Errorf("failed to save history of transaction: %w", err)
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -324,6 +395,7 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 	return nil
 }
 
+//nolint:cyclop
 func (s *Store) WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -338,7 +410,7 @@ func (s *Store) WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction
 
 	var wallet models.Wallet
 
-	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID)
+	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID, tx)
 	if err != nil {
 		return fmt.Errorf("failed to get wallet: %w", err)
 	}
@@ -362,6 +434,12 @@ SET balance = balance - $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 		return models.ErrWalletNotFound
 	}
 
+	transaction.Name = "withdraw"
+
+	if err = s.createTx(ctx, transaction, tx); err != nil {
+		return fmt.Errorf("failed to save history of transaction: %w", err)
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -370,6 +448,7 @@ SET balance = balance - $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 	return nil
 }
 
+//nolint:cyclop
 func (s *Store) Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction, rate float64) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -384,7 +463,7 @@ func (s *Store) Transfer(ctx context.Context, userID uuid.UUID, transaction mode
 
 	var wallet models.Wallet
 
-	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID)
+	wallet, err = s.getWalletTx(ctx, transaction.FirstWalletID, userID, tx)
 	if err != nil {
 		return fmt.Errorf("failed to get wallet: %w", err)
 	}
@@ -411,6 +490,12 @@ SET balance = balance + ($2::numeric * $3::numeric), updated_at = NOW() WHERE id
 
 	if err = checkRow(firstRow, secondRow); err != nil {
 		return fmt.Errorf("nothing changed: %w", err)
+	}
+
+	transaction.Name = "transfer"
+
+	if err = s.createTx(ctx, transaction, tx); err != nil {
+		return fmt.Errorf("failed to save history of transaction: %w", err)
 	}
 
 	err = tx.Commit(ctx)

@@ -91,7 +91,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 }
 
 func (s *IntegrationTestSuite) SetupTest() {
-	err := s.db.Truncate(context.Background(), "wallets", "users")
+	err := s.db.Truncate(context.Background(), "transactions", "wallets", "users")
 	s.Require().NoError(err)
 }
 
