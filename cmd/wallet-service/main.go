@@ -12,7 +12,7 @@ import (
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
-	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
+	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
@@ -30,7 +30,7 @@ func main() {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
 
-	if err := db.Migrate(migrate.Up); err != nil {
+	if err = db.Migrate(migrate.Up); err != nil {
 		logrus.Panicf("failed to migrate users: %v", err)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	defer func() {
-		if err := kafkaConsumer.Close(); err != nil {
+		if err = kafkaConsumer.Close(); err != nil {
 			logrus.Warnf("failed to close consumer: %v", err)
 		}
 	}()
@@ -66,7 +66,7 @@ func main() {
 		return fmt.Errorf("server stopped: %w", err)
 	})
 
-	if err := eg.Wait(); err != nil {
+	if err = eg.Wait(); err != nil {
 		logrus.Panicf("eg.Wait(): %v", err)
 	}
 }

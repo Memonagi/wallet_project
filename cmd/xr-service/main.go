@@ -5,8 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	xrserver "github.com/Memonagi/wallet_project/internal/xr-server"
-	xrservice "github.com/Memonagi/wallet_project/internal/xr-service"
+	xrserver "github.com/Memonagi/wallet_project/internal/xr/xr-server"
+	xrservice "github.com/Memonagi/wallet_project/internal/xr/xr-service"
 	"github.com/sirupsen/logrus"
 )
 

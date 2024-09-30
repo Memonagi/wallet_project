@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Memonagi/wallet_project/internal/generateusers"
+	generateusers "github.com/Memonagi/wallet_project/internal/generate-users"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/sirupsen/logrus"
 )
@@ -20,14 +20,14 @@ func main() {
 	}
 
 	defer func() {
-		if err := kafkaProducer.Close(); err != nil {
+		if err = kafkaProducer.Close(); err != nil {
 			logrus.Warnf("Failed to close producer: %v", err)
 		}
 	}()
 
 	generator := generateusers.New(kafkaProducer)
 
-	if err := generator.Run(ctx); err != nil {
+	if err = generator.Run(ctx); err != nil {
 		logrus.Panicf("Failed to run generator: %v", err)
 	}
 }

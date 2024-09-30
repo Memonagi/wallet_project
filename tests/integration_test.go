@@ -15,9 +15,9 @@ import (
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
-	xrclient "github.com/Memonagi/wallet_project/internal/xr-client"
-	xrserver "github.com/Memonagi/wallet_project/internal/xr-server"
-	xrservice "github.com/Memonagi/wallet_project/internal/xr-service"
+	"github.com/Memonagi/wallet_project/internal/xr/xr-client"
+	"github.com/Memonagi/wallet_project/internal/xr/xr-server"
+	"github.com/Memonagi/wallet_project/internal/xr/xr-service"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -91,7 +91,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 }
 
 func (s *IntegrationTestSuite) SetupTest() {
-	err := s.db.Truncate(context.Background(), "wallets", "users")
+	err := s.db.Truncate(context.Background(), "transactions", "wallets", "users")
 	s.Require().NoError(err)
 }
 
