@@ -10,6 +10,7 @@ import (
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
+	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
@@ -25,7 +26,18 @@ func main() {
 
 	cfg := config.New()
 
-	db, err := database.New(ctx, database.Config{Dsn: cfg.GetPostgresDSN()})
+	txProducer, err := producer.New("localhost:9094")
+	if err != nil {
+		logrus.Panicf("Failed to create producer: %v", err)
+	}
+
+	defer func() {
+		if err = txProducer.Close(); err != nil {
+			logrus.Warnf("Failed to close producer: %v", err)
+		}
+	}()
+
+	db, err := database.New(ctx, database.Config{Dsn: cfg.GetPostgresDSN()}, txProducer)
 	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
@@ -55,13 +67,13 @@ func main() {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		err = kafkaConsumer.Run(ctx)
+		err := kafkaConsumer.Run(ctx)
 
 		return fmt.Errorf("kafka consumer stopped: %w", err)
 	})
 
 	eg.Go(func() error {
-		err = httpServer.Run(ctx)
+		err := httpServer.Run(ctx)
 
 		return fmt.Errorf("server stopped: %w", err)
 	})

@@ -42,3 +42,7 @@ func (p *Producer) produceMessage(topic, key, message string) error {
 func (p *Producer) ProduceUsers(key, value string) error {
 	return p.produceMessage("user_updates", key, value)
 }
+
+func (p *Producer) ProduceTx(key, value string) error {
+	return p.produceMessage("transaction_updates", key, value)
+}
