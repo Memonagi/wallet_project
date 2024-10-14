@@ -2,21 +2,18 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
 )
-
-type txProducer interface {
-	ProduceTx(key, value string) error
-}
 
 func (s *Store) getWalletTx(ctx context.Context, walletID, userID uuid.UUID, dbTx pgx.Tx) (models.Wallet, error) {
 	var wallet models.Wallet
@@ -72,15 +69,6 @@ func (s *Store) createTx(ctx context.Context, transaction models.Transaction, db
 		return fmt.Errorf("failed to save history of transaction in database: %w", err)
 	}
 
-	txJSON, err := json.Marshal(transaction)
-	if err != nil {
-		return fmt.Errorf("failed to marshal transaction: %w", err)
-	}
-
-	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
-		return fmt.Errorf("failed to produce transaction: %w", err)
-	}
-
 	return nil
 }
 
@@ -91,7 +79,7 @@ func (s *Store) Deposit(ctx context.Context, userID uuid.UUID, transaction model
 	}
 
 	defer func() {
-		if err = tx.Rollback(ctx); err != nil && errors.Is(err, pgx.ErrTxClosed) {
+		if err = tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logrus.Warnf("failed to rollback transaction: %v", err)
 		}
 	}()
@@ -141,7 +129,7 @@ func (s *Store) WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction
 	}
 
 	defer func() {
-		if err = tx.Rollback(ctx); err != nil && errors.Is(err, pgx.ErrTxClosed) {
+		if err = tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logrus.Warnf("failed to rollback transaction: %v", err)
 		}
 	}()
@@ -194,7 +182,7 @@ func (s *Store) Transfer(ctx context.Context, userID uuid.UUID, transaction mode
 	}
 
 	defer func() {
-		if err = tx.Rollback(ctx); err != nil && errors.Is(err, pgx.ErrTxClosed) {
+		if err = tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logrus.Warnf("failed to rollback transaction: %v", err)
 		}
 	}()
@@ -261,4 +249,100 @@ func checkRow(firstRow, secondRow pgconn.CommandTag) error {
 	}
 
 	return nil
+}
+
+func (s *Store) GetTransactions(ctx context.Context, request models.GetWalletsRequest,
+	walletID uuid.UUID,
+) ([]models.Transaction, error) {
+	var (
+		transactions []models.Transaction
+		rows         pgx.Rows
+		err          error
+	)
+
+	query, args := s.getTxQuery(request, walletID)
+	if rows, err = s.db.Query(ctx, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to get transactions: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var transaction models.Transaction
+		if err = rows.Scan(
+			&transaction.ID,
+			&transaction.Name,
+			&transaction.FirstWalletID,
+			&transaction.SecondWalletID,
+			&transaction.Currency,
+			&transaction.Money,
+			&transaction.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan transactions row: %w", err)
+		}
+
+		transactions = append(transactions, transaction)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to get transactions: %w", err)
+	}
+
+	if len(transactions) == 0 {
+		return []models.Transaction{}, nil
+	}
+
+	return transactions, nil
+}
+
+func (s *Store) getTxQuery(request models.GetWalletsRequest, walletID uuid.UUID) (string, []any) {
+	var (
+		sb             strings.Builder
+		args           []any
+		validSortParam = map[string]string{
+			"id":         "id",
+			"name":       "name",
+			"currency":   "currency",
+			"money":      "money",
+			"created_at": "created_at",
+		}
+	)
+
+	sb.WriteString(`SELECT id, name, first_wallet, second_wallet, currency, money, created_at 
+FROM transactions WHERE `)
+
+	args = append(args, walletID)
+	sb.WriteString(fmt.Sprintf(`first_wallet = $%d`, len(args)))
+
+	if request.Filter != "" {
+		args = append(args, "%"+request.Filter+"%")
+		sb.WriteString(fmt.Sprintf(` AND concat_ws(' ', id, name, currency, money, created_at) 
+ILIKE $%d`, len(args)))
+	}
+
+	sorting, ok := validSortParam[request.Sorting]
+
+	if !ok {
+		sorting = "id"
+	}
+
+	sb.WriteString(` ORDER BY ` + sorting)
+
+	if request.Descending {
+		sb.WriteString(" DESC")
+	}
+
+	if request.Limit == 0 {
+		request.Limit = server.DefaultLimit
+	}
+
+	args = append(args, request.Limit)
+	sb.WriteString(fmt.Sprintf(" LIMIT $%d", len(args)))
+
+	if request.Offset > 0 {
+		args = append(args, request.Offset)
+		sb.WriteString(fmt.Sprintf(" OFFSET $%d", len(args)))
+	}
+
+	return sb.String(), args
 }

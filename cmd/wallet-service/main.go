@@ -26,18 +26,7 @@ func main() {
 
 	cfg := config.New()
 
-	txProducer, err := producer.New("localhost:9094")
-	if err != nil {
-		logrus.Panicf("Failed to create producer: %v", err)
-	}
-
-	defer func() {
-		if err = txProducer.Close(); err != nil {
-			logrus.Warnf("Failed to close producer: %v", err)
-		}
-	}()
-
-	db, err := database.New(ctx, database.Config{Dsn: cfg.GetPostgresDSN()}, txProducer)
+	db, err := database.New(ctx, database.Config{Dsn: cfg.GetPostgresDSN()})
 	if err != nil {
 		logrus.Panicf("failed to connect to database: %v", err)
 	}
@@ -59,8 +48,19 @@ func main() {
 		}
 	}()
 
+	txProducer, err := producer.New(producer.Config{Address: cfg.GetKafkaPort()})
+	if err != nil {
+		logrus.Panicf("Failed to create producer: %v", err)
+	}
+
+	defer func() {
+		if err = txProducer.Close(); err != nil {
+			logrus.Warnf("Failed to close producer: %v", err)
+		}
+	}()
+
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
-	svc := service.New(db, client)
+	svc := service.New(db, client, txProducer)
 	jwtClaims := jwtclaims.New()
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
 

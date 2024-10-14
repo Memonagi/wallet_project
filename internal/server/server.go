@@ -25,6 +25,8 @@ type service interface {
 	Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
 	WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
 	Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
+	GetTransactions(ctx context.Context, request models.GetWalletsRequest, walletID uuid.UUID,
+		userID uuid.UUID) ([]models.Transaction, error)
 }
 
 type Server struct {
@@ -70,6 +72,7 @@ func New(cfg Config, service service, key *rsa.PublicKey) *Server {
 		r.Put("/{id}/deposit", s.deposit)
 		r.Put("/{id}/withdraw", s.withdrawMoney)
 		r.Put("/{id}/transfer", s.transfer)
+		r.Get("/{id}/transactions", s.getTransactions)
 	})
 
 	return &s
@@ -355,4 +358,28 @@ func (s *Server) transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.okResponse(w, http.StatusOK, "successful transaction")
+}
+
+func (s *Server) getTransactions(w http.ResponseWriter, r *http.Request) {
+	request := parseGetWalletsRequest(r)
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+
+	walletID, err := uuid.Parse(id)
+	if err != nil {
+		s.errorResponse(w, "error parsing uuid", err)
+
+		return
+	}
+
+	userInfo := s.getFromContext(ctx)
+
+	transactions, err := s.service.GetTransactions(ctx, request, walletID, userInfo.UserID)
+	if err != nil {
+		s.errorResponse(w, "error getting transactions", err)
+
+		return
+	}
+
+	s.okResponse(w, http.StatusOK, transactions)
 }

@@ -10,8 +10,12 @@ type Producer struct {
 	producer sarama.SyncProducer
 }
 
-func New(address string) (*Producer, error) {
-	producer, err := sarama.NewSyncProducer([]string{address}, nil)
+type Config struct {
+	Address string
+}
+
+func New(cfg Config) (*Producer, error) {
+	producer, err := sarama.NewSyncProducer([]string{cfg.Address}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating sync producer: %w", err)
 	}

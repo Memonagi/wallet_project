@@ -486,3 +486,148 @@ func (s *IntegrationTestSuite) TestTransfer() {
 		s.sendRequest(http.MethodPut, walletIDPath, http.StatusNotFound, &transaction, nil, existingUser)
 	})
 }
+
+func (s *IntegrationTestSuite) TestGetTransactions() {
+	// Arrange
+	firstWallet := models.Wallet{
+		WalletID: uuid.New(),
+		UserID:   uuid.New(),
+		Name:     "proverkaGET_TX_1",
+		Currency: "RUB",
+	}
+
+	secondWallet := models.Wallet{
+		WalletID: uuid.New(),
+		UserID:   uuid.New(),
+		Name:     "proverkaGET_TX_2",
+		Currency: "RUB",
+	}
+
+	err := s.db.UpsertUser(context.Background(), existingUser)
+	s.Require().NoError(err)
+
+	secondUser := models.User{
+		UserID: uuid.New(),
+	}
+
+	err = s.db.UpsertUser(context.Background(), secondUser)
+	s.Require().NoError(err)
+
+	firstWallet.UserID = existingUser.UserID
+	secondWallet.UserID = secondUser.UserID
+	firstCreatedWallet := models.Wallet{}
+	secondCreatedWallet := models.Wallet{}
+
+	s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &firstWallet, &firstCreatedWallet, existingUser)
+
+	s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &secondWallet, &secondCreatedWallet, secondUser)
+
+	s.Run("empty list", func() {
+		var transactions []models.Transaction
+
+		uuidString := firstCreatedWallet.WalletID.String()
+		walletTxPath := walletPath + "/" + uuidString + "/transactions"
+		// Act
+		s.sendRequest(http.MethodGet, walletTxPath, http.StatusOK, nil, &transactions, existingUser)
+
+		// Assert
+		s.Require().Len(transactions, 0)
+	})
+
+	firstTx := models.Transaction{
+		Name:          "deposit",
+		FirstWalletID: firstCreatedWallet.WalletID,
+		Money:         10000.0,
+		Currency:      "RUB",
+	}
+
+	uuidString := firstCreatedWallet.WalletID.String()
+	firstWalletIDPath := walletPath + "/" + uuidString + "/deposit"
+
+	s.sendRequest(http.MethodPut, firstWalletIDPath, http.StatusOK, &firstTx, nil, existingUser)
+
+	secondTx := models.Transaction{
+		Name:           "transfer",
+		FirstWalletID:  firstCreatedWallet.WalletID,
+		SecondWalletID: secondCreatedWallet.WalletID,
+		Money:          1000.0,
+		Currency:       "RUB",
+	}
+
+	secWalletIDPath := walletPath + "/" + uuidString + "/transfer"
+
+	s.sendRequest(http.MethodPut, secWalletIDPath, http.StatusOK, &secondTx, nil, existingUser)
+
+	thirdTx := models.Transaction{
+		Name:          "withdraw",
+		FirstWalletID: firstCreatedWallet.WalletID,
+		Money:         5000.0,
+		Currency:      "RUB",
+	}
+
+	thirdWalletIDPath := walletPath + "/" + uuidString + "/withdraw"
+
+	s.sendRequest(http.MethodPut, thirdWalletIDPath, http.StatusOK, &thirdTx, nil, existingUser)
+
+	txPath := walletPath + "/" + uuidString + "/transactions"
+
+	s.Run("read successfully", func() {
+		var transactions []models.Transaction
+
+		s.sendRequest(http.MethodGet, txPath, http.StatusOK, nil, &transactions, existingUser)
+
+		s.Require().Len(transactions, 3)
+	})
+
+	s.Run("descending names read successfully", func() {
+		var transactions []models.Transaction
+		descTxPath := txPath + "?sorting=name&descending=true"
+
+		// Act
+		s.sendRequest(http.MethodGet, descTxPath, http.StatusOK, nil, &transactions, existingUser)
+
+		// Assert
+		s.Require().Equal(thirdTx.Name, transactions[0].Name)
+		s.Require().Equal(thirdTx.Currency, transactions[0].Currency)
+
+		s.Require().Equal(secondTx.Name, transactions[1].Name)
+		s.Require().Equal(secondTx.Currency, transactions[1].Currency)
+
+		s.Require().Equal(firstTx.Name, transactions[2].Name)
+		s.Require().Equal(firstTx.Currency, transactions[2].Currency)
+	})
+
+	s.Run("filter read successfully", func() {
+		var transactions []models.Transaction
+		filterTxPath := txPath + "?filter=eur"
+
+		// Act
+		s.sendRequest(http.MethodGet, filterTxPath, http.StatusOK, nil, &transactions, existingUser)
+
+		// Assert
+		s.Require().Len(transactions, 0)
+	})
+
+	s.Run("limit and offset read successfully", func() {
+		var transactions []models.Transaction
+		limitTxPath := txPath + "?sorting=name&limit=2&offset=2"
+
+		// Act
+		s.sendRequest(http.MethodGet, limitTxPath, http.StatusOK, nil, &transactions, existingUser)
+
+		// Assert
+		s.Require().Len(transactions, 1)
+	})
+
+	s.Run("user is not the owner of the wallet", func() {
+		userFromAnotherMother := models.User{
+			UserID: uuid.New(),
+		}
+
+		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
+		s.Require().NoError(err)
+
+		// Act
+		s.sendRequest(http.MethodGet, txPath, http.StatusNotFound, nil, nil, userFromAnotherMother)
+	})
+}

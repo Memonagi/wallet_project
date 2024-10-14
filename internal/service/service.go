@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Memonagi/wallet_project/internal/models"
@@ -19,21 +20,30 @@ type wallets interface {
 	Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
 	WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
 	Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction, rate float64) error
+	GetTransactions(ctx context.Context, request models.GetWalletsRequest,
+		walletID uuid.UUID) ([]models.Transaction, error)
 }
 
 type xrClient interface {
 	GetRate(ctx context.Context, from, to string) (float64, error)
 }
 
+//go:generate mockgen -source=service.go -destination=../mocks/mock_txproducer.gen.go -package=mocks txProducer
+type txProducer interface {
+	ProduceTx(key, value string) error
+}
+
 type Service struct {
 	wallets  wallets
 	xrClient xrClient
+	producer txProducer
 }
 
-func New(wallets wallets, xrClient xrClient) *Service {
+func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 	return &Service{
 		wallets:  wallets,
 		xrClient: xrClient,
+		producer: producer,
 	}
 }
 
@@ -145,6 +155,15 @@ func (s *Service) Deposit(ctx context.Context, userID uuid.UUID, transaction mod
 		return fmt.Errorf("failed deposit: %w", err)
 	}
 
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deposit transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce deposit transaction: %w", err)
+	}
+
 	return nil
 }
 
@@ -155,6 +174,15 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID uuid.UUID, transacti
 
 	if err := s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
 		return fmt.Errorf("failed withdraw money: %w", err)
+	}
+
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal withdraw transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce withdraw transaction: %w", err)
 	}
 
 	return nil
@@ -187,5 +215,30 @@ func (s *Service) Transfer(ctx context.Context, userID uuid.UUID, transaction mo
 		return fmt.Errorf("failed transfer transaction: %w", err)
 	}
 
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal transfer transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce transfer transaction: %w", err)
+	}
+
 	return nil
+}
+
+func (s *Service) GetTransactions(ctx context.Context, request models.GetWalletsRequest,
+	walletID uuid.UUID, userID uuid.UUID,
+) ([]models.Transaction, error) {
+	_, err := s.GetWallet(ctx, walletID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("%w", models.ErrWrongUserID)
+	}
+
+	transactions, err := s.wallets.GetTransactions(ctx, request, walletID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all transactions: %w", err)
+	}
+
+	return transactions, nil
 }

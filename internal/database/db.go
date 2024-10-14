@@ -13,9 +13,8 @@ import (
 )
 
 type Store struct {
-	db       *pgxpool.Pool
-	dsn      string
-	producer txProducer
+	db  *pgxpool.Pool
+	dsn string
 }
 
 type Config struct {
@@ -25,7 +24,7 @@ type Config struct {
 //go:embed migrations
 var migrations embed.FS
 
-func New(ctx context.Context, cfg Config, producer txProducer) (*Store, error) {
+func New(ctx context.Context, cfg Config) (*Store, error) {
 	db, err := pgxpool.New(ctx, cfg.Dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -38,9 +37,8 @@ func New(ctx context.Context, cfg Config, producer txProducer) (*Store, error) {
 	logrus.Info("connected to database")
 
 	return &Store{
-		db:       db,
-		dsn:      cfg.Dsn,
-		producer: producer,
+		db:  db,
+		dsn: cfg.Dsn,
 	}, nil
 }
 

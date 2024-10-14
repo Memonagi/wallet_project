@@ -12,6 +12,7 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
+	"github.com/Memonagi/wallet_project/internal/mocks"
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
@@ -65,10 +66,10 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	ctrl := gomock.NewController(s.T())
 	defer ctrl.Finish()
 
-	mockTxProducer := database.NewMocktxProducer(ctrl)
+	mockTxProducer := mocks.NewMocktxProducer(ctrl)
 	mockTxProducer.EXPECT().ProduceTx(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-	s.db, err = database.New(ctx, database.Config{Dsn: pgDSN}, mockTxProducer)
+	s.db, err = database.New(ctx, database.Config{Dsn: pgDSN})
 	s.Require().NoError(err)
 
 	err = s.db.Migrate(migrate.Up)
@@ -83,7 +84,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	}()
 
 	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
-	s.service = service.New(s.db, s.client)
+	s.service = service.New(s.db, s.client, mockTxProducer)
 	s.jwtClaims = jwtclaims.New()
 	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey())
 

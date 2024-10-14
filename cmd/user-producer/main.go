@@ -14,7 +14,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
 
-	kafkaProducer, err := producer.New("localhost:9094")
+	kafkaProducer, err := producer.New(producer.Config{Address: "localhost:9094"})
 	if err != nil {
 		logrus.Panicf("Failed to create producer: %v", err)
 	}

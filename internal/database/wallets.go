@@ -84,7 +84,7 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
 	}
 
 	defer func() {
-		if err = tx.Rollback(ctx); err != nil && errors.Is(err, pgx.ErrTxClosed) {
+		if err = tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logrus.Warnf("failed to rollback transaction: %v", err)
 		}
 	}()
