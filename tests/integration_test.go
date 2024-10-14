@@ -37,7 +37,7 @@ const (
 )
 
 var existingUser = models.User{
-	UserID:    uuid.New(),
+	UserID:    models.UserID(uuid.New()),
 	Status:    "active",
 	Archived:  false,
 	CreatedAt: time.Now(),

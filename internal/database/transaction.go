@@ -15,7 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Store) getWalletTx(ctx context.Context, walletID, userID uuid.UUID, dbTx pgx.Tx) (models.Wallet, error) {
+func (s *Store) getWalletTx(ctx context.Context, walletID models.WalletID, userID models.UserID,
+	dbTx pgx.Tx,
+) (models.Wallet, error) {
 	var wallet models.Wallet
 
 	query := `SELECT id, user_id, name, currency, balance, archived, created_at, updated_at 
@@ -54,7 +56,7 @@ func (s *Store) createTx(ctx context.Context, transaction models.Transaction, db
 		transaction.Money,
 	}
 
-	if transaction.SecondWalletID != uuid.Nil {
+	if transaction.SecondWalletID != nil {
 		args[3] = transaction.SecondWalletID
 	}
 
@@ -72,7 +74,7 @@ func (s *Store) createTx(ctx context.Context, transaction models.Transaction, db
 	return nil
 }
 
-func (s *Store) Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
+func (s *Store) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -122,7 +124,7 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 }
 
 //nolint:cyclop
-func (s *Store) WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
+func (s *Store) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -175,7 +177,9 @@ SET balance = balance - $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 }
 
 //nolint:cyclop
-func (s *Store) Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction, rate float64) error {
+func (s *Store) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction,
+	rate float64,
+) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -252,7 +256,7 @@ func checkRow(firstRow, secondRow pgconn.CommandTag) error {
 }
 
 func (s *Store) GetTransactions(ctx context.Context, request models.GetWalletsRequest,
-	walletID uuid.UUID,
+	walletID models.WalletID,
 ) ([]models.Transaction, error) {
 	var (
 		transactions []models.Transaction
@@ -295,7 +299,7 @@ func (s *Store) GetTransactions(ctx context.Context, request models.GetWalletsRe
 	return transactions, nil
 }
 
-func (s *Store) getTxQuery(request models.GetWalletsRequest, walletID uuid.UUID) (string, []any) {
+func (s *Store) getTxQuery(request models.GetWalletsRequest, walletID models.WalletID) (string, []any) {
 	var (
 		sb             strings.Builder
 		args           []any

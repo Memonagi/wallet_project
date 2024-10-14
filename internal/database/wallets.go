@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet, userID uuid.UUID) (models.Wallet, error) {
+func (s *Store) CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error) {
 	query := `INSERT INTO wallets 
     (id, user_id, name, currency)
 VALUES ($1, $2, $3, $4)
@@ -43,7 +43,7 @@ RETURNING id, user_id, name, currency, balance, archived, created_at, updated_at
 	return wallet, nil
 }
 
-func (s *Store) GetWallet(ctx context.Context, walletID, userID uuid.UUID,
+func (s *Store) GetWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.Wallet,
 ) (models.Wallet, error) {
 	query := `SELECT id, user_id, name, currency, balance, archived, created_at, updated_at 
@@ -69,7 +69,7 @@ FROM wallets WHERE id = $1 AND user_id = $2 AND archived = false`
 	return wallet, nil
 }
 
-func (s *Store) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
+func (s *Store) UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.WalletUpdate, rate float64,
 ) (models.Wallet, error) {
 	var (
@@ -127,8 +127,8 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
 	return updatedWallet, nil
 }
 
-func (s *Store) updateQuery(wallet models.WalletUpdate, baseWallet models.Wallet, rate float64, walletID,
-	userID uuid.UUID,
+func (s *Store) updateQuery(wallet models.WalletUpdate, baseWallet models.Wallet, rate float64,
+	walletID models.WalletID, userID models.UserID,
 ) (string, []any) {
 	var (
 		sb   strings.Builder
@@ -161,7 +161,7 @@ WHERE id = $%d AND user_id = $%d AND archived = false`, len(args)-1, len(args)))
 	return sb.String(), args
 }
 
-func (s *Store) DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) error {
+func (s *Store) DeleteWallet(ctx context.Context, walletID models.WalletID, userID models.UserID) error {
 	query := `UPDATE wallets SET
 	archived = true, 
 	updated_at = NOW()
@@ -176,7 +176,7 @@ func (s *Store) DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) er
 }
 
 func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest,
-	userID uuid.UUID,
+	userID models.UserID,
 ) ([]models.Wallet, error) {
 	var (
 		wallets []models.Wallet
@@ -219,7 +219,7 @@ func (s *Store) GetWallets(ctx context.Context, request models.GetWalletsRequest
 	return wallets, nil
 }
 
-func (s *Store) getWalletsQuery(request models.GetWalletsRequest, userID uuid.UUID) (string, []any) {
+func (s *Store) getWalletsQuery(request models.GetWalletsRequest, userID models.UserID) (string, []any) {
 	var (
 		sb             strings.Builder
 		args           []any
@@ -272,7 +272,7 @@ ILIKE $%d`, len(args)))
 	return sb.String(), args
 }
 
-func (s *Store) GetCurrency(ctx context.Context, walletID uuid.UUID) (models.WalletUpdate, error) {
+func (s *Store) GetCurrency(ctx context.Context, walletID models.WalletID) (models.WalletUpdate, error) {
 	var wallet models.WalletUpdate
 
 	query := `SELECT currency FROM wallets WHERE id = $1 AND archived = false`

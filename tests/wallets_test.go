@@ -11,8 +11,8 @@ import (
 func (s *IntegrationTestSuite) TestCreateWallet() {
 	// Arrange
 	wallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "proverkaPOST",
 		Currency: "USD",
 	}
@@ -43,7 +43,7 @@ func (s *IntegrationTestSuite) TestCreateWallet() {
 		s.Require().NoError(err)
 
 		userFromAnotherMother := models.User{
-			UserID: uuid.New(),
+			UserID: models.UserID(uuid.New()),
 		}
 
 		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
@@ -59,8 +59,8 @@ func (s *IntegrationTestSuite) TestCreateWallet() {
 func (s *IntegrationTestSuite) TestGetWallet() {
 	// Arrange
 	wallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "proverkaGET",
 		Currency: "USD",
 	}
@@ -74,7 +74,7 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 	s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &wallet, &createdWallet, existingUser)
 
 	s.Run("user not found", func() {
-		uuidString := wallet.WalletID.String()
+		uuidString := uuid.UUID(wallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -82,7 +82,7 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 	})
 
 	s.Run("get wallet successfully", func() {
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -96,13 +96,13 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 
 	s.Run("user is not the owner of the wallet", func() {
 		userFromAnotherMother := models.User{
-			UserID: uuid.New(),
+			UserID: models.UserID(uuid.New()),
 		}
 
 		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
 		s.Require().NoError(err)
 
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -113,8 +113,8 @@ func (s *IntegrationTestSuite) TestGetWallet() {
 func (s *IntegrationTestSuite) TestUpdateWallet() {
 	// Arrange
 	wallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "proverkaPATCH",
 		Currency: "USD",
 	}
@@ -128,7 +128,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 	s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &wallet, &createdWallet, existingUser)
 
 	s.Run("user not found", func() {
-		uuidString := wallet.WalletID.String()
+		uuidString := uuid.UUID(wallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -142,7 +142,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 			Name:     "renamedWallet",
 			Currency: createdWallet.Currency,
 		}
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -161,7 +161,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 			Name:     createdWallet.Name,
 			Currency: "RUB",
 		}
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -180,7 +180,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 			Name:     "renamedWallet",
 			Currency: "RUB",
 		}
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -194,7 +194,7 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 
 	s.Run("nothing to update", func() {
 		updatedWallet := createdWallet
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -208,18 +208,18 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 
 	s.Run("user is not the owner of the wallet", func() {
 		userFromAnotherMother := models.User{
-			UserID: uuid.New(),
+			UserID: models.UserID(uuid.New()),
 		}
 		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
 		s.Require().NoError(err)
 
 		updatedWallet := models.Wallet{
-			WalletID: uuid.New(),
+			WalletID: models.WalletID(uuid.New()),
 			UserID:   userFromAnotherMother.UserID,
 			Name:     "renamedWallet",
 			Currency: "RUB",
 		}
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -230,14 +230,14 @@ func (s *IntegrationTestSuite) TestUpdateWallet() {
 func (s *IntegrationTestSuite) TestDeleteWallet() {
 	// Arrange
 	wallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "proverkaDELETE",
 		Currency: "USD",
 	}
 
 	s.Run("user not found", func() {
-		uuidString := wallet.WalletID.String()
+		uuidString := uuid.UUID(wallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -253,7 +253,7 @@ func (s *IntegrationTestSuite) TestDeleteWallet() {
 	s.sendRequest(http.MethodPost, walletPath, http.StatusCreated, &wallet, &createdWallet, existingUser)
 
 	s.Run("deleted successfully", func() {
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -262,12 +262,12 @@ func (s *IntegrationTestSuite) TestDeleteWallet() {
 
 	s.Run("user is not the owner of the wallet", func() {
 		userFromAnotherMother := models.User{
-			UserID: uuid.New(),
+			UserID: models.UserID(uuid.New()),
 		}
 		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
 		s.Require().NoError(err)
 
-		uuidString := createdWallet.WalletID.String()
+		uuidString := uuid.UUID(createdWallet.WalletID).String()
 		walletIDPath := walletPath + "/" + uuidString
 
 		// Act
@@ -278,22 +278,22 @@ func (s *IntegrationTestSuite) TestDeleteWallet() {
 func (s *IntegrationTestSuite) TestGetWallets() {
 	// Arrange
 	wallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "1_proverkaGETALL",
 		Currency: "USD",
 	}
 
 	secWallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "2_proverkaGETALL",
 		Currency: "RUB",
 	}
 
 	thirdWallet := models.Wallet{
-		WalletID: uuid.New(),
-		UserID:   uuid.New(),
+		WalletID: models.WalletID(uuid.New()),
+		UserID:   models.UserID(uuid.New()),
 		Name:     "3_proverkaGETALL",
 		Currency: "EUR",
 	}
@@ -382,7 +382,7 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 
 	s.Run("user is not the owner of the wallet", func() {
 		userFromAnotherMother := models.User{
-			UserID: uuid.New(),
+			UserID: models.UserID(uuid.New()),
 		}
 
 		err = s.db.UpsertUser(context.Background(), userFromAnotherMother)
@@ -401,3 +401,6 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 // TODO metrics
 // TODO id
 // TODO worker
+// TODO swagger
+// TODO regexp
+// TODO data race task

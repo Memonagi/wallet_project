@@ -8,13 +8,12 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type Claims struct {
-	UserID uuid.UUID `json:"userId"`
-	Email  string    `json:"email"`
-	Role   string    `json:"role"`
+	UserID models.UserID `json:"userId"`
+	Email  string        `json:"email"`
+	Role   string        `json:"role"`
 	jwt.RegisteredClaims
 }
 
