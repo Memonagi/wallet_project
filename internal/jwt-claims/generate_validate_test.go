@@ -7,6 +7,7 @@ import (
 	"time"
 
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
+	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ func TestJWTSetupSuite(t *testing.T) {
 
 func (s *JWTTestSuite) TestGenerateToken() {
 	claims := jwtclaims.New()
-	claims.UserID = uuid.New()
+	claims.UserID = models.UserID(uuid.New())
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
@@ -46,7 +47,7 @@ func (s *JWTTestSuite) TestGenerateToken() {
 
 func (s *JWTTestSuite) TestValidateToken() {
 	claims := jwtclaims.New()
-	claims.UserID = uuid.New()
+	claims.UserID = models.UserID(uuid.New())
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
@@ -68,7 +69,7 @@ func (s *JWTTestSuite) TestValidateInvalidSignature() {
 	randomPublicKey := &randomPrivateKey.PublicKey
 
 	claims := jwtclaims.New()
-	claims.UserID = uuid.New()
+	claims.UserID = models.UserID(uuid.New())
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
@@ -83,7 +84,7 @@ func (s *JWTTestSuite) TestValidateInvalidSignature() {
 
 func (s *JWTTestSuite) TestValidateInvalidSignatureMethod() {
 	claims := jwtclaims.New()
-	claims.UserID = uuid.New()
+	claims.UserID = models.UserID(uuid.New())
 	claims.Email = "test@yandex.ru"
 	claims.Role = "moderator"
 
@@ -99,7 +100,7 @@ func (s *JWTTestSuite) TestValidateInvalidSignatureMethod() {
 
 func (s *JWTTestSuite) TestValidateExpiredToken() {
 	claims := &jwtclaims.Claims{
-		UserID: uuid.New(),
+		UserID: models.UserID(uuid.New()),
 		Email:  "test@yandex.ru",
 		Role:   "moderator",
 		RegisteredClaims: jwt.RegisteredClaims{

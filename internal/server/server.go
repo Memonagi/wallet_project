@@ -17,14 +17,17 @@ import (
 )
 
 type service interface {
-	CreateWallet(ctx context.Context, wallet models.Wallet, userID uuid.UUID) (models.Wallet, error)
-	GetWallet(ctx context.Context, walletID, userID uuid.UUID) (models.Wallet, error)
-	UpdateWallet(ctx context.Context, walletID, userID uuid.UUID, wallet models.WalletUpdate) (models.Wallet, error)
-	DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) error
-	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID uuid.UUID) ([]models.Wallet, error)
-	Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
-	WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
-	Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
+	CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error)
+	GetWallet(ctx context.Context, walletID models.WalletID, userID models.UserID) (models.Wallet, error)
+	UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
+		wallet models.WalletUpdate) (models.Wallet, error)
+	DeleteWallet(ctx context.Context, walletID models.WalletID, userID models.UserID) error
+	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID models.UserID) ([]models.Wallet, error)
+	Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error
+	WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error
+	Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction) error
+	GetTransactions(ctx context.Context, request models.GetWalletsRequest, walletID models.WalletID,
+		userID models.UserID) ([]models.Transaction, error)
 }
 
 type Server struct {
@@ -70,6 +73,7 @@ func New(cfg Config, service service, key *rsa.PublicKey) *Server {
 		r.Put("/{id}/deposit", s.deposit)
 		r.Put("/{id}/withdraw", s.withdrawMoney)
 		r.Put("/{id}/transfer", s.transfer)
+		r.Get("/{id}/transactions", s.getTransactions)
 	})
 
 	return &s
@@ -183,7 +187,7 @@ func (s *Server) getWallet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userInfo := s.getFromContext(ctx)
 
-	walletInfo, err := s.service.GetWallet(ctx, walletID, userInfo.UserID)
+	walletInfo, err := s.service.GetWallet(ctx, models.WalletID(walletID), userInfo.UserID)
 	if err != nil {
 		s.errorResponse(w, "error reading wallet", err)
 
@@ -214,7 +218,7 @@ func (s *Server) updateWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedWallet, err := s.service.UpdateWallet(ctx, walletID, userInfo.UserID, wallet)
+	updatedWallet, err := s.service.UpdateWallet(ctx, models.WalletID(walletID), userInfo.UserID, wallet)
 	if err != nil {
 		s.errorResponse(w, "error updating wallet", err)
 
@@ -237,7 +241,7 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userInfo := s.getFromContext(ctx)
 
-	if err = s.service.DeleteWallet(ctx, walletID, userInfo.UserID); err != nil {
+	if err = s.service.DeleteWallet(ctx, models.WalletID(walletID), userInfo.UserID); err != nil {
 		s.errorResponse(w, "error deleting wallet", err)
 
 		return
@@ -247,7 +251,7 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
-	request := parseGetWalletsRequest(r)
+	request := parseGetRequest(r)
 	ctx := r.Context()
 	userInfo := s.getFromContext(ctx)
 
@@ -261,7 +265,7 @@ func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
 	s.okResponse(w, http.StatusOK, wallets)
 }
 
-func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
+func parseGetRequest(r *http.Request) models.GetWalletsRequest {
 	queryParams := r.URL.Query()
 
 	g := models.GetWalletsRequest{
@@ -355,4 +359,28 @@ func (s *Server) transfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.okResponse(w, http.StatusOK, "successful transaction")
+}
+
+func (s *Server) getTransactions(w http.ResponseWriter, r *http.Request) {
+	request := parseGetRequest(r)
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+
+	walletID, err := uuid.Parse(id)
+	if err != nil {
+		s.errorResponse(w, "error parsing uuid", err)
+
+		return
+	}
+
+	userInfo := s.getFromContext(ctx)
+
+	transactions, err := s.service.GetTransactions(ctx, request, models.WalletID(walletID), userInfo.UserID)
+	if err != nil {
+		s.errorResponse(w, "error getting transactions", err)
+
+		return
+	}
+
+	s.okResponse(w, http.StatusOK, transactions)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
+	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
@@ -47,21 +48,32 @@ func main() {
 		}
 	}()
 
+	txProducer, err := producer.New(producer.Config{Address: cfg.GetKafkaPort()})
+	if err != nil {
+		logrus.Panicf("Failed to create producer: %v", err)
+	}
+
+	defer func() {
+		if err = txProducer.Close(); err != nil {
+			logrus.Warnf("Failed to close producer: %v", err)
+		}
+	}()
+
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
-	svc := service.New(db, client)
+	svc := service.New(db, client, txProducer)
 	jwtClaims := jwtclaims.New()
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		err = kafkaConsumer.Run(ctx)
+		err := kafkaConsumer.Run(ctx)
 
 		return fmt.Errorf("kafka consumer stopped: %w", err)
 	})
 
 	eg.Go(func() error {
-		err = httpServer.Run(ctx)
+		err := httpServer.Run(ctx)
 
 		return fmt.Errorf("server stopped: %w", err)
 	})

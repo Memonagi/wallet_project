@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/Memonagi/wallet_project/internal/models"
@@ -9,35 +10,45 @@ import (
 )
 
 type wallets interface {
-	CreateWallet(ctx context.Context, wallet models.Wallet, userID uuid.UUID) (models.Wallet, error)
-	GetWallet(ctx context.Context, walletID, userID uuid.UUID, wallet models.Wallet) (models.Wallet, error)
-	UpdateWallet(ctx context.Context, walletID, userID uuid.UUID, wallet models.WalletUpdate,
+	CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error)
+	GetWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
+		wallet models.Wallet) (models.Wallet, error)
+	UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID, wallet models.WalletUpdate,
 		rate float64) (models.Wallet, error)
-	DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) error
-	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID uuid.UUID) ([]models.Wallet, error)
-	GetCurrency(ctx context.Context, walletID uuid.UUID) (models.WalletUpdate, error)
-	Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
-	WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error
-	Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction, rate float64) error
+	DeleteWallet(ctx context.Context, walletID models.WalletID, userID models.UserID) error
+	GetWallets(ctx context.Context, request models.GetWalletsRequest, userID models.UserID) ([]models.Wallet, error)
+	GetCurrency(ctx context.Context, walletID models.WalletID) (models.WalletUpdate, error)
+	Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error
+	WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error
+	Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction, rate float64) error
+	GetTransactions(ctx context.Context, request models.GetWalletsRequest,
+		walletID models.WalletID) ([]models.Transaction, error)
 }
 
 type xrClient interface {
 	GetRate(ctx context.Context, from, to string) (float64, error)
 }
 
+//go:generate mockgen -source=service.go -destination=../mocks/mock_txproducer.gen.go -package=mocks txProducer
+type txProducer interface {
+	ProduceTx(key, value string) error
+}
+
 type Service struct {
 	wallets  wallets
 	xrClient xrClient
+	producer txProducer
 }
 
-func New(wallets wallets, xrClient xrClient) *Service {
+func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 	return &Service{
 		wallets:  wallets,
 		xrClient: xrClient,
+		producer: producer,
 	}
 }
 
-func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet, userID uuid.UUID) (models.Wallet, error) {
+func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error) {
 	if err := wallet.Validate(); err != nil {
 		return models.Wallet{}, fmt.Errorf("%w", err)
 	}
@@ -58,12 +69,14 @@ func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet, userID
 	return newWallet, nil
 }
 
-func (s *Service) GetWallet(ctx context.Context, walletID, userID uuid.UUID) (models.Wallet, error) {
-	if walletID == uuid.Nil {
+func (s *Service) GetWallet(ctx context.Context, walletID models.WalletID,
+	userID models.UserID,
+) (models.Wallet, error) {
+	if walletID == models.WalletID(uuid.Nil) {
 		return models.Wallet{}, fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
-	if userID == uuid.Nil {
+	if userID == models.UserID(uuid.Nil) {
 		return models.Wallet{}, fmt.Errorf("%w", models.ErrUserID)
 	}
 
@@ -77,7 +90,7 @@ func (s *Service) GetWallet(ctx context.Context, walletID, userID uuid.UUID) (mo
 	return walletInfo, nil
 }
 
-func (s *Service) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
+func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.WalletUpdate,
 ) (models.Wallet, error) {
 	if err := wallet.Validate(); err != nil {
@@ -113,8 +126,8 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID, userID uuid.UUID,
 	return updatedWallet, nil
 }
 
-func (s *Service) DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) error {
-	if walletID == uuid.Nil {
+func (s *Service) DeleteWallet(ctx context.Context, walletID models.WalletID, userID models.UserID) error {
+	if walletID == models.WalletID(uuid.Nil) {
 		return fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
@@ -126,7 +139,7 @@ func (s *Service) DeleteWallet(ctx context.Context, walletID, userID uuid.UUID) 
 }
 
 func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsRequest,
-	userID uuid.UUID,
+	userID models.UserID,
 ) ([]models.Wallet, error) {
 	wallets, err := s.wallets.GetWallets(ctx, request, userID)
 	if err != nil {
@@ -136,7 +149,7 @@ func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsReque
 	return wallets, nil
 }
 
-func (s *Service) Deposit(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
+func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
@@ -145,10 +158,19 @@ func (s *Service) Deposit(ctx context.Context, userID uuid.UUID, transaction mod
 		return fmt.Errorf("failed deposit: %w", err)
 	}
 
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deposit transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce deposit transaction: %w", err)
+	}
+
 	return nil
 }
 
-func (s *Service) WithdrawMoney(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
+func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
@@ -157,19 +179,28 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID uuid.UUID, transacti
 		return fmt.Errorf("failed withdraw money: %w", err)
 	}
 
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal withdraw transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce withdraw transaction: %w", err)
+	}
+
 	return nil
 }
 
-func (s *Service) Transfer(ctx context.Context, userID uuid.UUID, transaction models.Transaction) error {
+func (s *Service) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
-	if transaction.SecondWalletID == uuid.Nil {
+	if transaction.SecondWalletID == nil {
 		return fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
-	secondWallet, err := s.wallets.GetCurrency(ctx, transaction.SecondWalletID)
+	secondWallet, err := s.wallets.GetCurrency(ctx, *transaction.SecondWalletID)
 	if err != nil {
 		return fmt.Errorf("failed to get second wallet: %w", err)
 	}
@@ -187,5 +218,30 @@ func (s *Service) Transfer(ctx context.Context, userID uuid.UUID, transaction mo
 		return fmt.Errorf("failed transfer transaction: %w", err)
 	}
 
+	txJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return fmt.Errorf("failed to marshal transfer transaction: %w", err)
+	}
+
+	if err = s.producer.ProduceTx("", string(txJSON)); err != nil {
+		return fmt.Errorf("failed to produce transfer transaction: %w", err)
+	}
+
 	return nil
+}
+
+func (s *Service) GetTransactions(ctx context.Context, request models.GetWalletsRequest,
+	walletID models.WalletID, userID models.UserID,
+) ([]models.Transaction, error) {
+	_, err := s.GetWallet(ctx, walletID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("%w", models.ErrWrongUserID)
+	}
+
+	transactions, err := s.wallets.GetTransactions(ctx, request, walletID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all transactions: %w", err)
+	}
+
+	return transactions, nil
 }

@@ -13,12 +13,15 @@ import (
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/models"
+	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
+	"github.com/Memonagi/wallet_project/internal/service/mocks"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-server"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-service"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
@@ -34,7 +37,7 @@ const (
 )
 
 var existingUser = models.User{
-	UserID:    uuid.New(),
+	UserID:    models.UserID(uuid.New()),
 	Status:    "active",
 	Archived:  false,
 	CreatedAt: time.Now(),
@@ -43,14 +46,15 @@ var existingUser = models.User{
 
 type IntegrationTestSuite struct {
 	suite.Suite
-	cancelFn  context.CancelFunc
-	db        *database.Store
-	service   *service.Service
-	server    *server.Server
-	client    *xrclient.Client
-	xrService *xrservice.Service
-	xrServer  *xrserver.Server
-	jwtClaims *jwtclaims.Claims
+	cancelFn   context.CancelFunc
+	db         *database.Store
+	service    *service.Service
+	server     *server.Server
+	client     *xrclient.Client
+	xrService  *xrservice.Service
+	xrServer   *xrserver.Server
+	jwtClaims  *jwtclaims.Claims
+	txProducer *producer.Producer
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
@@ -58,6 +62,12 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	s.cancelFn = cancel
 
 	var err error
+
+	ctrl := gomock.NewController(s.T())
+	defer ctrl.Finish()
+
+	mockTxProducer := mocks.NewMocktxProducer(ctrl)
+	mockTxProducer.EXPECT().ProduceTx(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	s.db, err = database.New(ctx, database.Config{Dsn: pgDSN})
 	s.Require().NoError(err)
@@ -74,7 +84,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	}()
 
 	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
-	s.service = service.New(s.db, s.client)
+	s.service = service.New(s.db, s.client, mockTxProducer)
 	s.jwtClaims = jwtclaims.New()
 	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey())
 

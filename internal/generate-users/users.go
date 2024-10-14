@@ -65,7 +65,7 @@ func generateInfo() *models.UserExternal {
 	createdAt := time.Now().Add(-time.Duration(rand.Intn(userIDMax)) * time.Hour)
 
 	return &models.UserExternal{
-		UserID:      uuid.New(),
+		UserID:      models.UserID(uuid.New()),
 		UserName:    randomString(userNameLen),
 		UserSurname: randomString(userSurnameLen),
 		//nolint:gosec

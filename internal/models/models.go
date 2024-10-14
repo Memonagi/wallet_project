@@ -8,8 +8,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type (
+	WalletID uuid.UUID
+	UserID   uuid.UUID
+	TxID     uuid.UUID
+)
+
 type UserExternal struct {
-	UserID           uuid.UUID `json:"userId"`
+	UserID           UserID    `json:"userId"`
 	UserName         string    `json:"userName"`
 	UserSurname      string    `json:"userSurname"`
 	UserAge          int       `json:"userAge"`
@@ -24,7 +30,7 @@ type UserExternal struct {
 }
 
 type User struct {
-	UserID    uuid.UUID `json:"userId"`
+	UserID    UserID    `json:"userId"`
 	Status    string    `json:"status"`
 	Archived  bool      `json:"archived"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -32,8 +38,8 @@ type User struct {
 }
 
 type Wallet struct {
-	WalletID  uuid.UUID `json:"walletId"`
-	UserID    uuid.UUID `json:"userId"`
+	WalletID  WalletID  `json:"walletId"`
+	UserID    UserID    `json:"userId"`
 	Name      string    `json:"name"`
 	Currency  string    `json:"currency"`
 	Balance   float64   `json:"balance"`
@@ -56,9 +62,9 @@ type GetWalletsRequest struct {
 }
 
 type UserInfo struct {
-	UserID uuid.UUID `json:"userId"`
-	Email  string    `json:"email"`
-	Role   string    `json:"role"`
+	UserID UserID `json:"userId"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
 }
 
 type XRRequest struct {
@@ -71,10 +77,10 @@ type XRResponse struct {
 }
 
 type Transaction struct {
-	ID             uuid.UUID `json:"id"`
+	ID             TxID      `json:"id"`
 	Name           string    `json:"name"`
-	FirstWalletID  uuid.UUID `json:"firstWallet"`
-	SecondWalletID uuid.UUID `json:"secondWallet"`
+	FirstWalletID  WalletID  `json:"firstWallet"`
+	SecondWalletID *WalletID `json:"secondWallet"`
 	Money          float64   `json:"money"`
 	Currency       string    `json:"currency"`
 	CreatedAt      time.Time `json:"createdAt"`
@@ -136,7 +142,7 @@ func (t *Transaction) Validate() error {
 		return ErrWrongMoney
 	case t.Money < 0:
 		return ErrWrongMoney
-	case t.FirstWalletID == uuid.Nil:
+	case t.FirstWalletID == WalletID(uuid.Nil):
 		return ErrWalletNotFound
 	}
 
