@@ -12,11 +12,11 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
-	"github.com/Memonagi/wallet_project/internal/mocks"
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
+	"github.com/Memonagi/wallet_project/internal/service/mocks"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-server"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-service"

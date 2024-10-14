@@ -250,7 +250,7 @@ func (s *Server) deleteWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
-	request := parseGetWalletsRequest(r)
+	request := parseGetRequest(r)
 	ctx := r.Context()
 	userInfo := s.getFromContext(ctx)
 
@@ -264,7 +264,7 @@ func (s *Server) getWallets(w http.ResponseWriter, r *http.Request) {
 	s.okResponse(w, http.StatusOK, wallets)
 }
 
-func parseGetWalletsRequest(r *http.Request) models.GetWalletsRequest {
+func parseGetRequest(r *http.Request) models.GetWalletsRequest {
 	queryParams := r.URL.Query()
 
 	g := models.GetWalletsRequest{
@@ -361,7 +361,7 @@ func (s *Server) transfer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getTransactions(w http.ResponseWriter, r *http.Request) {
-	request := parseGetWalletsRequest(r)
+	request := parseGetRequest(r)
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
