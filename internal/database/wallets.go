@@ -288,3 +288,28 @@ func (s *Store) GetCurrency(ctx context.Context, walletID models.WalletID) (mode
 
 	return wallet, nil
 }
+
+func (s *Store) WalletCleaner(ctx context.Context) error {
+	query := `UPDATE wallets SET archived = true, updated_at = NOW() 
+               WHERE archived = false AND updated_at < NOW() - interval '1 year'`
+
+	res, err := s.db.Exec(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to archive inactive wallets: %w", err)
+	}
+
+	rows := res.RowsAffected()
+	if rows == 0 {
+		logrus.Info("no inactive wallets found")
+
+		return nil
+	}
+
+	logrus.Info("inactive wallets archived")
+
+	return nil
+}
+
+func (s *Store) QueryRowFunc(ctx context.Context, query string, args ...any) pgx.Row {
+	return s.db.QueryRow(ctx, query, args...)
+}
