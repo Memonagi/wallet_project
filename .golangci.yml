@@ -12,12 +12,12 @@ linters:
     - execinquery
     - exhaustive
     - exhaustruct
+    - exportloopref
     - gomnd
     - ireturn
     - varnamelen
     - tagalign
     - wastedassign
-    - exportloopref
 
 run:
   timeout: 10m

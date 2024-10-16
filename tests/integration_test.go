@@ -17,6 +17,7 @@ import (
 	"github.com/Memonagi/wallet_project/internal/server"
 	"github.com/Memonagi/wallet_project/internal/service"
 	"github.com/Memonagi/wallet_project/internal/service/mocks"
+	walletcleanup "github.com/Memonagi/wallet_project/internal/wallet-cleanup"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-server"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-service"
@@ -55,6 +56,7 @@ type IntegrationTestSuite struct {
 	xrServer   *xrserver.Server
 	jwtClaims  *jwtclaims.Claims
 	txProducer *producer.Producer
+	cleaner    *walletcleanup.Cleanup
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
