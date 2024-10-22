@@ -6,14 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Memonagi/wallet_project/internal/application"
 	"github.com/Memonagi/wallet_project/internal/config"
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
-	"github.com/Memonagi/wallet_project/internal/service"
-	walletcleanup "github.com/Memonagi/wallet_project/internal/wallet-cleanup"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
@@ -62,10 +61,9 @@ func main() {
 	}()
 
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
-	svc := service.New(db, client, txProducer)
+	svc := application.New(db, client, txProducer)
 	jwtClaims := jwtclaims.New()
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
-	cleanup := walletcleanup.New(db)
 
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -82,7 +80,7 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		err := cleanup.Run(ctx)
+		err := svc.Run(ctx)
 
 		return fmt.Errorf("inactive wallets cleanup stopped: %w", err)
 	})

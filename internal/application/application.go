@@ -1,14 +1,16 @@
-package service
+package application
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/google/uuid"
 )
 
+//nolint:interfacebloat
 type wallets interface {
 	CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error)
 	GetWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
@@ -23,6 +25,7 @@ type wallets interface {
 	Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction, rate float64) error
 	GetTransactions(ctx context.Context, request models.GetWalletsRequest,
 		walletID models.WalletID) ([]models.Transaction, error)
+	WalletCleaner(ctx context.Context) error
 }
 
 type xrClient interface {
@@ -40,12 +43,38 @@ type Service struct {
 	producer txProducer
 }
 
+const cleanupTicker = 24 * time.Hour
+
 func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 	return &Service{
 		wallets:  wallets,
 		xrClient: xrClient,
 		producer: producer,
 	}
+}
+
+func (s *Service) Run(ctx context.Context) error {
+	t := time.NewTicker(cleanupTicker)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+			if err := s.cleanupWallet(ctx); err != nil {
+				return fmt.Errorf("failed to cleanup inactive wallets: %w", err)
+			}
+		}
+	}
+}
+
+func (s *Service) cleanupWallet(ctx context.Context) error {
+	if err := s.wallets.WalletCleaner(ctx); err != nil {
+		return fmt.Errorf("failed to cleanup wallets: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) CreateWallet(ctx context.Context, wallet models.Wallet, userID models.UserID) (models.Wallet, error) {
