@@ -6,13 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Memonagi/wallet_project/internal/application"
 	"github.com/Memonagi/wallet_project/internal/config"
 	"github.com/Memonagi/wallet_project/internal/consumer"
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
-	"github.com/Memonagi/wallet_project/internal/service"
 	xrclient "github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+//nolint:funlen
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	defer cancel()
@@ -60,7 +61,7 @@ func main() {
 	}()
 
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
-	svc := service.New(db, client, txProducer)
+	svc := application.New(db, client, txProducer)
 	jwtClaims := jwtclaims.New()
 	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
 
@@ -76,6 +77,12 @@ func main() {
 		err := httpServer.Run(ctx)
 
 		return fmt.Errorf("server stopped: %w", err)
+	})
+
+	eg.Go(func() error {
+		err := svc.Run(ctx)
+
+		return fmt.Errorf("inactive wallets cleanup stopped: %w", err)
 	})
 
 	if err = eg.Wait(); err != nil {

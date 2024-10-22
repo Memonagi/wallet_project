@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Memonagi/wallet_project/internal/application"
+	"github.com/Memonagi/wallet_project/internal/application/mocks"
 	"github.com/Memonagi/wallet_project/internal/database"
 	jwtclaims "github.com/Memonagi/wallet_project/internal/jwt-claims"
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/producer"
 	"github.com/Memonagi/wallet_project/internal/server"
-	"github.com/Memonagi/wallet_project/internal/service"
-	"github.com/Memonagi/wallet_project/internal/service/mocks"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-client"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-server"
 	"github.com/Memonagi/wallet_project/internal/xr/xr-service"
@@ -48,7 +48,7 @@ type IntegrationTestSuite struct {
 	suite.Suite
 	cancelFn   context.CancelFunc
 	db         *database.Store
-	service    *service.Service
+	service    *application.Service
 	server     *server.Server
 	client     *xrclient.Client
 	xrService  *xrservice.Service
@@ -84,12 +84,17 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	}()
 
 	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
-	s.service = service.New(s.db, s.client, mockTxProducer)
+	s.service = application.New(s.db, s.client, mockTxProducer)
 	s.jwtClaims = jwtclaims.New()
 	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey())
 
 	go func() {
-		err = s.server.Run(ctx)
+		err := s.service.Run(ctx)
+		s.Require().NoError(err)
+	}()
+
+	go func() {
+		err := s.server.Run(ctx)
 		s.Require().NoError(err)
 	}()
 
