@@ -13,8 +13,9 @@ import (
 )
 
 type Store struct {
-	db  *pgxpool.Pool
-	dsn string
+	db      *pgxpool.Pool
+	dsn     string
+	metrics *metrics
 }
 
 type Config struct {
@@ -37,8 +38,9 @@ func New(ctx context.Context, cfg Config) (*Store, error) {
 	logrus.Info("connected to database")
 
 	return &Store{
-		db:  db,
-		dsn: cfg.Dsn,
+		db:      db,
+		dsn:     cfg.Dsn,
+		metrics: newMetric(),
 	}, nil
 }
 

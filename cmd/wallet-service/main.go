@@ -63,7 +63,8 @@ func main() {
 	client := xrclient.New(xrclient.Config{ServerAddress: cfg.GetXRServerAddress()})
 	svc := application.New(db, client, txProducer)
 	jwtClaims := jwtclaims.New()
-	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey())
+	metrics := svc.Metrics
+	httpServer := server.New(server.Config{Port: cfg.GetAppPort()}, svc, jwtClaims.GetPublicKey(), metrics)
 
 	eg, ctx := errgroup.WithContext(ctx)
 

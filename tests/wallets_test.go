@@ -399,7 +399,6 @@ func (s *IntegrationTestSuite) TestGetWallets() {
 }
 
 // TODO metrics
-// TODO worker
 // TODO swagger
 // TODO regexp
 // TODO data race task

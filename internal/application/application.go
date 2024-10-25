@@ -41,6 +41,7 @@ type Service struct {
 	wallets  wallets
 	xrClient xrClient
 	producer txProducer
+	Metrics  *metrics
 }
 
 const cleanupTicker = 24 * time.Hour
@@ -50,6 +51,7 @@ func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 		wallets:  wallets,
 		xrClient: xrClient,
 		producer: producer,
+		Metrics:  newMetrics(),
 	}
 }
 
@@ -149,6 +151,10 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, us
 	baseWallet.Name = wallet.Name
 
 	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, userID, baseWallet, rate); err != nil {
+		// Считается ли апдейт транзакцией? Или он только реализован как транзакция, и метрики в данном случае
+		// отслеживать не нужно?
+		s.Metrics.txFailed.WithLabelValues("updating wallet").Inc()
+
 		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 
@@ -180,10 +186,14 @@ func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsReque
 
 func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
+		s.Metrics.txFailed.WithLabelValues("deposit").Inc()
+
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
 	if err := s.wallets.Deposit(ctx, userID, transaction); err != nil {
+		s.Metrics.txFailed.WithLabelValues("deposit").Inc()
+
 		return fmt.Errorf("failed deposit: %w", err)
 	}
 
@@ -201,10 +211,14 @@ func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction
 
 func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
+		s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
+
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
 	if err := s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
+		s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
+
 		return fmt.Errorf("failed withdraw money: %w", err)
 	}
 
@@ -222,15 +236,21 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, trans
 
 func (s *Service) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	if err := transaction.Validate(); err != nil {
+		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
 	if transaction.SecondWalletID == nil {
+		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+
 		return fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
 	secondWallet, err := s.wallets.GetCurrency(ctx, *transaction.SecondWalletID)
 	if err != nil {
+		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+
 		return fmt.Errorf("failed to get second wallet: %w", err)
 	}
 
@@ -244,6 +264,8 @@ func (s *Service) Transfer(ctx context.Context, userID models.UserID, transactio
 	}
 
 	if err = s.wallets.Transfer(ctx, userID, transaction, rate); err != nil {
+		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+
 		return fmt.Errorf("failed transfer transaction: %w", err)
 	}
 

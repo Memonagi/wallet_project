@@ -14,11 +14,10 @@ import (
 type contextKey string
 
 const (
-	ctxKey    contextKey = "ctxKey"
-	roleAdmin string     = "admin"
+	ctxKey contextKey = "ctxKey"
 )
 
-func (s *Server) JWTCheck(next http.Handler) http.Handler {
+func (s *Server) jwtAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := r.Header.Get("Authorization")
 		if header == "" {
@@ -76,4 +75,14 @@ func (s *Server) getFromContext(ctx context.Context) models.UserInfo {
 	userInfo, _ := ctx.Value(ctxKey).(models.UserInfo)
 
 	return userInfo
+}
+
+func (s *Server) metricTrack(next http.Handler) http.Handler {
+	var fn http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
+		defer s.metrics.TrackHTTPRequest(time.Now(), r)
+
+		next.ServeHTTP(w, r)
+	}
+
+	return fn
 }

@@ -76,7 +76,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	s.xrService = xrservice.New()
-	s.xrServer = xrserver.New(xrPort, s.xrService)
+	s.xrServer = xrserver.New(xrPort, s.xrService, s.xrService.Metrics)
 
 	go func() {
 		err := s.xrServer.Run(ctx)
@@ -86,7 +86,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	s.client = xrclient.New(xrclient.Config{ServerAddress: xrAddress})
 	s.service = application.New(s.db, s.client, mockTxProducer)
 	s.jwtClaims = jwtclaims.New()
-	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey())
+	s.server = server.New(server.Config{Port: port}, s.service, s.jwtClaims.GetPublicKey(), s.service.Metrics)
 
 	go func() {
 		err := s.service.Run(ctx)

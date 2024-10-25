@@ -8,10 +8,14 @@ import (
 	"github.com/Memonagi/wallet_project/internal/models"
 )
 
-type Service struct{}
+type Service struct {
+	Metrics *metrics
+}
 
 func New() *Service {
-	return &Service{}
+	return &Service{
+		Metrics: newMetrics(),
+	}
 }
 
 const round = 100
