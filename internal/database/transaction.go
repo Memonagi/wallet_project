@@ -77,10 +77,8 @@ func (s *Store) createTxInTable(ctx context.Context, transaction models.Transact
 
 func (s *Store) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	timeStart := time.Now()
-
 	defer func() {
-		duration := time.Since(timeStart).Seconds()
-		s.metrics.txDuration.WithLabelValues("deposit").Observe(duration)
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
 	}()
 
 	tx, err := s.db.Begin(ctx)
@@ -134,10 +132,8 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 //nolint:cyclop
 func (s *Store) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
 	timeStart := time.Now()
-
 	defer func() {
-		duration := time.Since(timeStart).Seconds()
-		s.metrics.txDuration.WithLabelValues("deposit").Observe(duration)
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
 	}()
 
 	tx, err := s.db.Begin(ctx)
@@ -196,10 +192,8 @@ func (s *Store) Transfer(ctx context.Context, userID models.UserID, transaction 
 	rate float64,
 ) error {
 	timeStart := time.Now()
-
 	defer func() {
-		duration := time.Since(timeStart).Seconds()
-		s.metrics.txDuration.WithLabelValues("deposit").Observe(duration)
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
 	}()
 
 	tx, err := s.db.Begin(ctx)

@@ -124,14 +124,22 @@ func (s *Service) GetWallet(ctx context.Context, walletID models.WalletID,
 func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.WalletUpdate,
 ) (models.Wallet, error) {
-	if err := wallet.Validate(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			s.Metrics.txFailed.WithLabelValues("update").Inc()
+		} else {
+			s.Metrics.txCompleted.WithLabelValues("update").Inc()
+		}
+	}()
+
+	if err = wallet.Validate(); err != nil {
 		return models.Wallet{}, fmt.Errorf("%w", err)
 	}
 
 	var (
 		updatedWallet models.Wallet
 		baseWallet    models.WalletUpdate
-		err           error
 		rate          = 1.00
 	)
 
@@ -151,10 +159,6 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, us
 	baseWallet.Name = wallet.Name
 
 	if updatedWallet, err = s.wallets.UpdateWallet(ctx, walletID, userID, baseWallet, rate); err != nil {
-		// Считается ли апдейт транзакцией? Или он только реализован как транзакция, и метрики в данном случае
-		// отслеживать не нужно?
-		s.Metrics.txFailed.WithLabelValues("updating wallet").Inc()
-
 		return models.Wallet{}, fmt.Errorf("failed update wallet info: %w", err)
 	}
 
@@ -184,16 +188,22 @@ func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsReque
 	return wallets, nil
 }
 
+//nolint:dupl
 func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
-		s.Metrics.txFailed.WithLabelValues("deposit").Inc()
+	var err error
+	defer func() {
+		if err != nil {
+			s.Metrics.txFailed.WithLabelValues("deposit").Inc()
+		} else {
+			s.Metrics.txCompleted.WithLabelValues("deposit").Inc()
+		}
+	}()
 
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
-	if err := s.wallets.Deposit(ctx, userID, transaction); err != nil {
-		s.Metrics.txFailed.WithLabelValues("deposit").Inc()
-
+	if err = s.wallets.Deposit(ctx, userID, transaction); err != nil {
 		return fmt.Errorf("failed deposit: %w", err)
 	}
 
@@ -209,16 +219,22 @@ func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction
 	return nil
 }
 
+//nolint:dupl
 func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
-		s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
+	var err error
+	defer func() {
+		if err != nil {
+			s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
+		} else {
+			s.Metrics.txCompleted.WithLabelValues("withdraw").Inc()
+		}
+	}()
 
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
-	if err := s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
-		s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
-
+	if err = s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
 		return fmt.Errorf("failed withdraw money: %w", err)
 	}
 
@@ -235,22 +251,25 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, trans
 }
 
 func (s *Service) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
-		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+	var err error
+	defer func() {
+		if err != nil {
+			s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+		} else {
+			s.Metrics.txCompleted.WithLabelValues("transfer").Inc()
+		}
+	}()
 
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
 	if transaction.SecondWalletID == nil {
-		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
-
 		return fmt.Errorf("%w", models.ErrEmptyID)
 	}
 
 	secondWallet, err := s.wallets.GetCurrency(ctx, *transaction.SecondWalletID)
 	if err != nil {
-		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
-
 		return fmt.Errorf("failed to get second wallet: %w", err)
 	}
 
@@ -264,8 +283,6 @@ func (s *Service) Transfer(ctx context.Context, userID models.UserID, transactio
 	}
 
 	if err = s.wallets.Transfer(ctx, userID, transaction, rate); err != nil {
-		s.Metrics.txFailed.WithLabelValues("transfer").Inc()
-
 		return fmt.Errorf("failed transfer transaction: %w", err)
 	}
 

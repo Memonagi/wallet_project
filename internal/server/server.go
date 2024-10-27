@@ -12,6 +12,7 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -31,16 +32,12 @@ type service interface {
 		userID models.UserID) ([]models.Transaction, error)
 }
 
-type metrics interface {
-	TrackHTTPRequest(start time.Time, r *http.Request)
-}
-
 type Server struct {
 	service service
 	server  *http.Server
 	key     *rsa.PublicKey
 	port    int
-	metrics metrics
+	metrics *metrics
 }
 
 type Config struct {
@@ -53,7 +50,7 @@ const (
 	DefaultLimit      = 25
 )
 
-func New(cfg Config, service service, key *rsa.PublicKey, metrics metrics) *Server {
+func New(cfg Config, service service, key *rsa.PublicKey) *Server {
 	r := chi.NewRouter()
 
 	s := Server{
@@ -66,12 +63,13 @@ func New(cfg Config, service service, key *rsa.PublicKey, metrics metrics) *Serv
 		},
 		key:     key,
 		port:    cfg.Port,
-		metrics: metrics,
+		metrics: newMetrics(),
 	}
 
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	r.Route("/api/v1/wallets", func(r chi.Router) {
+		r.Use(middleware.Recoverer)
 		r.Use(s.jwtAuth)
 		r.Use(s.metricTrack)
 

@@ -18,15 +18,11 @@ type service interface {
 	GetRate(request models.XRRequest) (float64, error)
 }
 
-type metrics interface {
-	TrackExternalRequest(start time.Time, endpoint string)
-}
-
 type Server struct {
 	service service
 	server  *http.Server
 	port    int
-	metrics metrics
+	metrics *metrics
 }
 
 type Config struct {
@@ -38,7 +34,7 @@ const (
 	gracefulTimeout   = 10 * time.Second
 )
 
-func New(port int, service service, metrics metrics) *Server {
+func New(port int, service service) *Server {
 	r := chi.NewRouter()
 
 	s := Server{
@@ -49,7 +45,7 @@ func New(port int, service service, metrics metrics) *Server {
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
 		port:    port,
-		metrics: metrics,
+		metrics: newMetric(),
 	}
 
 	r.Route("/api/v1/xr", func(r chi.Router) {
@@ -133,7 +129,7 @@ func (s *Server) readExchangeRate(w http.ResponseWriter, r *http.Request) {
 
 	response := models.XRResponse{Rate: rate}
 
-	s.metrics.TrackExternalRequest(time.Now(), r.URL.Path)
+	s.metrics.trackExternalRequest(time.Now(), r.URL.Path)
 
 	s.okResponse(w, http.StatusOK, response)
 }

@@ -17,8 +17,7 @@ func main() {
 	defer cancel()
 
 	svc := xrservice.New()
-	metrics := svc.Metrics
-	server := xrserver.New(port, svc, metrics)
+	server := xrserver.New(port, svc)
 
 	if err := server.Run(ctx); err != nil {
 		logrus.Panicf("failed to start server: %v", err)

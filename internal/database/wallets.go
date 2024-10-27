@@ -70,7 +70,6 @@ FROM wallets WHERE id = $1 AND user_id = $2 AND archived = false`
 	return wallet, nil
 }
 
-//nolint:funlen
 func (s *Store) UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.WalletUpdate, rate float64,
 ) (models.Wallet, error) {
@@ -81,10 +80,8 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID models.WalletID, user
 	)
 
 	timeStart := time.Now()
-
 	defer func() {
-		duration := time.Since(timeStart).Seconds()
-		s.metrics.txDuration.WithLabelValues("deposit").Observe(duration)
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
 	}()
 
 	tx, err := s.db.Begin(ctx)

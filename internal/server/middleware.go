@@ -79,7 +79,7 @@ func (s *Server) getFromContext(ctx context.Context) models.UserInfo {
 
 func (s *Server) metricTrack(next http.Handler) http.Handler {
 	var fn http.HandlerFunc = func(w http.ResponseWriter, r *http.Request) {
-		defer s.metrics.TrackHTTPRequest(time.Now(), r)
+		defer s.metrics.trackHTTPRequest(time.Now(), r)
 
 		next.ServeHTTP(w, r)
 	}
