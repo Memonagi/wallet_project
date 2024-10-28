@@ -41,7 +41,7 @@ type Service struct {
 	wallets  wallets
 	xrClient xrClient
 	producer txProducer
-	Metrics  *metrics
+	metrics  *metrics
 }
 
 const cleanupTicker = 24 * time.Hour
@@ -51,7 +51,7 @@ func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 		wallets:  wallets,
 		xrClient: xrClient,
 		producer: producer,
-		Metrics:  newMetrics(),
+		metrics:  newMetrics(),
 	}
 }
 
@@ -127,9 +127,9 @@ func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, us
 	var err error
 	defer func() {
 		if err != nil {
-			s.Metrics.txFailed.WithLabelValues("update").Inc()
+			s.metrics.txFailed.WithLabelValues("update").Inc()
 		} else {
-			s.Metrics.txCompleted.WithLabelValues("update").Inc()
+			s.metrics.txCompleted.WithLabelValues("update").Inc()
 		}
 	}()
 
@@ -193,9 +193,9 @@ func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction
 	var err error
 	defer func() {
 		if err != nil {
-			s.Metrics.txFailed.WithLabelValues("deposit").Inc()
+			s.metrics.txFailed.WithLabelValues("deposit").Inc()
 		} else {
-			s.Metrics.txCompleted.WithLabelValues("deposit").Inc()
+			s.metrics.txCompleted.WithLabelValues("deposit").Inc()
 		}
 	}()
 
@@ -224,9 +224,9 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, trans
 	var err error
 	defer func() {
 		if err != nil {
-			s.Metrics.txFailed.WithLabelValues("withdraw").Inc()
+			s.metrics.txFailed.WithLabelValues("withdraw").Inc()
 		} else {
-			s.Metrics.txCompleted.WithLabelValues("withdraw").Inc()
+			s.metrics.txCompleted.WithLabelValues("withdraw").Inc()
 		}
 	}()
 
@@ -254,9 +254,9 @@ func (s *Service) Transfer(ctx context.Context, userID models.UserID, transactio
 	var err error
 	defer func() {
 		if err != nil {
-			s.Metrics.txFailed.WithLabelValues("transfer").Inc()
+			s.metrics.txFailed.WithLabelValues("transfer").Inc()
 		} else {
-			s.Metrics.txCompleted.WithLabelValues("transfer").Inc()
+			s.metrics.txCompleted.WithLabelValues("transfer").Inc()
 		}
 	}()
 

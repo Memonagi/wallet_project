@@ -10,7 +10,6 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/go-chi/chi/v5"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +21,6 @@ type Server struct {
 	service service
 	server  *http.Server
 	port    int
-	metrics *metrics
 }
 
 type Config struct {
@@ -44,15 +42,12 @@ func New(port int, service service) *Server {
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
-		port:    port,
-		metrics: newMetric(),
+		port: port,
 	}
 
 	r.Route("/api/v1/xr", func(r chi.Router) {
 		r.Get("/", s.readExchangeRate)
 	})
-
-	r.Get("/xr/metrics", promhttp.Handler().ServeHTTP)
 
 	return &s
 }
@@ -128,8 +123,6 @@ func (s *Server) readExchangeRate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := models.XRResponse{Rate: rate}
-
-	s.metrics.trackExternalRequest(time.Now(), r.URL.Path)
 
 	s.okResponse(w, http.StatusOK, response)
 }

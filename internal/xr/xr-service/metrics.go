@@ -1,8 +1,6 @@
-package xrserver
+package xrservice
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -13,7 +11,7 @@ type metrics struct {
 
 const (
 	namespace = "xr_service"
-	subsystem = "server"
+	subsystem = "service"
 )
 
 func newMetric() *metrics {
@@ -29,10 +27,4 @@ func newMetric() *metrics {
 	}
 
 	return &metricList
-}
-
-func (m *metrics) trackExternalRequest(start time.Time, endpoint string) {
-	timePassed := time.Since(start).Seconds()
-
-	m.externalRequestDuration.WithLabelValues(endpoint).Observe(timePassed)
 }
