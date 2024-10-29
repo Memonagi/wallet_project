@@ -12,7 +12,9 @@ import (
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,6 +37,7 @@ type Server struct {
 	server  *http.Server
 	key     *rsa.PublicKey
 	port    int
+	metrics *metrics
 }
 
 type Config struct {
@@ -58,12 +61,17 @@ func New(cfg Config, service service, key *rsa.PublicKey) *Server {
 			Handler:           r,
 			ReadHeaderTimeout: readHeaderTimeout,
 		},
-		key:  key,
-		port: cfg.Port,
+		key:     key,
+		port:    cfg.Port,
+		metrics: newMetrics(),
 	}
 
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+
 	r.Route("/api/v1/wallets", func(r chi.Router) {
-		r.Use(s.JWTCheck)
+		r.Use(middleware.Recoverer)
+		r.Use(s.jwtAuth)
+		r.Use(s.metricTrack)
 
 		r.Post("/", s.createWallet)
 		r.Get("/{id}", s.getWallet)

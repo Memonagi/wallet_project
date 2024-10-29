@@ -16,6 +16,7 @@ import (
 type service interface {
 	GetRate(request models.XRRequest) (float64, error)
 }
+
 type Server struct {
 	service service
 	server  *http.Server

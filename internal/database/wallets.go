@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/server"
@@ -77,6 +78,11 @@ func (s *Store) UpdateWallet(ctx context.Context, walletID models.WalletID, user
 		args          []any
 		updatedWallet = models.Wallet{}
 	)
+
+	timeStart := time.Now()
+	defer func() {
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
+	}()
 
 	tx, err := s.db.Begin(ctx)
 	if err != nil {

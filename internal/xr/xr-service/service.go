@@ -4,19 +4,29 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
 )
 
-type Service struct{}
+type Service struct {
+	metrics *metrics
+}
 
 func New() *Service {
-	return &Service{}
+	return &Service{
+		metrics: newMetric(),
+	}
 }
 
 const round = 100
 
 func (s *Service) GetRate(request models.XRRequest) (float64, error) {
+	timeStart := time.Now()
+	defer func() {
+		s.metrics.externalRequestDuration.WithLabelValues("get_rate").Observe(time.Since(timeStart).Seconds())
+	}()
+
 	exchangeRates := map[string]float64{
 		"USD": 1.5, //nolint:mnd
 		"EUR": 1.6, //nolint:mnd

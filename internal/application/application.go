@@ -41,6 +41,7 @@ type Service struct {
 	wallets  wallets
 	xrClient xrClient
 	producer txProducer
+	metrics  *metrics
 }
 
 const cleanupTicker = 24 * time.Hour
@@ -50,6 +51,7 @@ func New(wallets wallets, xrClient xrClient, producer txProducer) *Service {
 		wallets:  wallets,
 		xrClient: xrClient,
 		producer: producer,
+		metrics:  newMetrics(),
 	}
 }
 
@@ -122,14 +124,22 @@ func (s *Service) GetWallet(ctx context.Context, walletID models.WalletID,
 func (s *Service) UpdateWallet(ctx context.Context, walletID models.WalletID, userID models.UserID,
 	wallet models.WalletUpdate,
 ) (models.Wallet, error) {
-	if err := wallet.Validate(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			s.metrics.txFailed.WithLabelValues("update").Inc()
+		} else {
+			s.metrics.txCompleted.WithLabelValues("update").Inc()
+		}
+	}()
+
+	if err = wallet.Validate(); err != nil {
 		return models.Wallet{}, fmt.Errorf("%w", err)
 	}
 
 	var (
 		updatedWallet models.Wallet
 		baseWallet    models.WalletUpdate
-		err           error
 		rate          = 1.00
 	)
 
@@ -178,12 +188,22 @@ func (s *Service) GetWallets(ctx context.Context, request models.GetWalletsReque
 	return wallets, nil
 }
 
+//nolint:dupl
 func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			s.metrics.txFailed.WithLabelValues("deposit").Inc()
+		} else {
+			s.metrics.txCompleted.WithLabelValues("deposit").Inc()
+		}
+	}()
+
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
-	if err := s.wallets.Deposit(ctx, userID, transaction); err != nil {
+	if err = s.wallets.Deposit(ctx, userID, transaction); err != nil {
 		return fmt.Errorf("failed deposit: %w", err)
 	}
 
@@ -199,12 +219,22 @@ func (s *Service) Deposit(ctx context.Context, userID models.UserID, transaction
 	return nil
 }
 
+//nolint:dupl
 func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			s.metrics.txFailed.WithLabelValues("withdraw").Inc()
+		} else {
+			s.metrics.txCompleted.WithLabelValues("withdraw").Inc()
+		}
+	}()
+
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 
-	if err := s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
+	if err = s.wallets.WithdrawMoney(ctx, userID, transaction); err != nil {
 		return fmt.Errorf("failed withdraw money: %w", err)
 	}
 
@@ -221,7 +251,16 @@ func (s *Service) WithdrawMoney(ctx context.Context, userID models.UserID, trans
 }
 
 func (s *Service) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
-	if err := transaction.Validate(); err != nil {
+	var err error
+	defer func() {
+		if err != nil {
+			s.metrics.txFailed.WithLabelValues("transfer").Inc()
+		} else {
+			s.metrics.txCompleted.WithLabelValues("transfer").Inc()
+		}
+	}()
+
+	if err = transaction.Validate(); err != nil {
 		return fmt.Errorf("error validating transaction: %w", err)
 	}
 

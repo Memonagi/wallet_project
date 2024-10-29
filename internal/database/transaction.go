@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Memonagi/wallet_project/internal/models"
 	"github.com/Memonagi/wallet_project/internal/server"
@@ -43,7 +44,7 @@ FROM wallets WHERE id = $1 AND user_id = $2 AND archived = false FOR UPDATE `
 	return wallet, nil
 }
 
-func (s *Store) createTx(ctx context.Context, transaction models.Transaction, dbTx pgx.Tx) error {
+func (s *Store) createTxInTable(ctx context.Context, transaction models.Transaction, dbTx pgx.Tx) error {
 	query := `INSERT INTO transactions 
     (id, name, first_wallet, second_wallet, currency, money) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 
@@ -75,6 +76,11 @@ func (s *Store) createTx(ctx context.Context, transaction models.Transaction, db
 }
 
 func (s *Store) Deposit(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
+	timeStart := time.Now()
+	defer func() {
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
+	}()
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -111,7 +117,7 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 
 	transaction.Name = "deposit"
 
-	if err = s.createTx(ctx, transaction, tx); err != nil {
+	if err = s.createTxInTable(ctx, transaction, tx); err != nil {
 		return fmt.Errorf("failed to save history of transaction: %w", err)
 	}
 
@@ -125,6 +131,11 @@ SET balance = balance + $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 
 //nolint:cyclop
 func (s *Store) WithdrawMoney(ctx context.Context, userID models.UserID, transaction models.Transaction) error {
+	timeStart := time.Now()
+	defer func() {
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
+	}()
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -164,7 +175,7 @@ SET balance = balance - $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 
 	transaction.Name = "withdraw"
 
-	if err = s.createTx(ctx, transaction, tx); err != nil {
+	if err = s.createTxInTable(ctx, transaction, tx); err != nil {
 		return fmt.Errorf("failed to save history of transaction: %w", err)
 	}
 
@@ -176,10 +187,15 @@ SET balance = balance - $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 AN
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop, funlen
 func (s *Store) Transfer(ctx context.Context, userID models.UserID, transaction models.Transaction,
 	rate float64,
 ) error {
+	timeStart := time.Now()
+	defer func() {
+		s.metrics.txDuration.WithLabelValues("deposit").Observe(time.Since(timeStart).Seconds())
+	}()
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -224,7 +240,7 @@ SET balance = balance + ($2::numeric * $3::numeric), updated_at = NOW() WHERE id
 
 	transaction.Name = "transfer"
 
-	if err = s.createTx(ctx, transaction, tx); err != nil {
+	if err = s.createTxInTable(ctx, transaction, tx); err != nil {
 		return fmt.Errorf("failed to save history of transaction: %w", err)
 	}
 
