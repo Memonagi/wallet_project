@@ -1,0 +1,372 @@
+openapi: 3.0.3
+
+info:
+  title: wallet-service API
+  version: 1.0.0
+  description: API for wallets and transactions
+
+servers:
+  - url: http://localhost:8080/api/v1
+
+paths:
+  /wallets:
+    post:
+      summary: create new wallet
+      description: creates new wallet and returns it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Wallet"
+      parameters:
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        201:
+          description: successfully created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        400:
+          description: empty name of the wallet
+        401:
+          description: invalid token
+        404:
+          description: user not found, wrong id
+        500:
+          description: internal server error
+    get:
+      summary: get wallets
+      description: returns all wallets
+      responses:
+        200:
+          description: wallets successfully read
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Wallet"
+        401:
+          description: invalid token
+        404:
+          description: user not found, wrong id
+        500:
+          description: internal server error
+  /wallets/{id}:
+    get:
+      summary: get wallet
+      description: return wallet by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successfully read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+    patch:
+      summary: update wallet
+      description: update wallet by id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Wallet"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+        400:
+          description: empty name of the wallet
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+    delete:
+      summary: delete wallet
+      description: delete wallet by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successfully deleted
+          content: {}
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+  /wallets/{id}/deposit:
+    put:
+      summary: deposit operation
+      description: increases the wallet balance, saves data to the database, sends data to kafka
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successful  deposit transaction
+          content: {}
+        400:
+          description: wrong entered data
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+  /wallets/{id}/withdraw:
+    put:
+      summary: withdraw operation
+      description: decreases the wallet balance, saves data to the database, sends data to kafka
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successful withdraw transaction
+          content: {}
+        400:
+          description: wrong entered data
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+  /wallets/{id}/transfer:
+    put:
+      summary: transfer operation
+      description: sends funds from wallet to wallet, saves data to the database, sends data to kafka
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Transaction"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: successful transfer transaction
+          content: {}
+        400:
+          description: wrong entered data
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+  /wallets/{id}/transactions:
+    get:
+      summary: get transactions
+      description: returns wallets transactions from database by wallet id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: wallet id
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          required: true
+          description: authentication token
+          schema:
+            type: string
+      responses:
+        200:
+          description: transactions successfully read
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+        401:
+          description: invalid token
+        404:
+          description: wallet not found
+        500:
+          description: internal server error
+
+components:
+  schemas:
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 39c61293-2a21-44dd-928f-e364eda35ec0
+        ownerID:
+          type: string
+          format: uuid
+          example: 6c9d6ebc-4e93-43d2-b97b-352a3bc2e900
+        name:
+          type: string
+          example: "Pupa's salary"
+        currency:
+          type: string
+          enum:
+            - RUB
+            - USD
+            - EUR
+            - JPY
+            - CNY
+            - CAD
+            - AUD
+          example: RUB
+        balance:
+          type: number
+          format: float
+          example: 1500.50
+        archived:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-10-28 08:24:03Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-10-28 12:24:03Z
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 39a69690-49af-4de1-abce-b6465c350ccf
+        name:
+          type: string
+          example: deposit
+        firstWalletID:
+          type: string
+          format: uuid
+          example: 39c61293-2a21-44dd-928f-e364eda35ec0
+        secondWalletID:
+          type: string
+          format: uuid
+          nullable: true
+          example: 3f4880de-ed45-4040-9893-f18a9c2eda67
+        currency:
+          type: string
+          enum:
+            - RUB
+            - USD
+            - EUR
+            - JPY
+            - CNY
+            - CAD
+            - AUD
+          example: RUB
+        money:
+          type: number
+          format: float
+          example: 500.50
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-10-28 08:24:03Z

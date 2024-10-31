@@ -112,6 +112,7 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
+//nolint:cyclop
 func getStatusCode(err error) int {
 	switch {
 	case errors.Is(err, models.ErrWalletNotFound) || errors.Is(err, models.ErrUserNotFound) ||
@@ -120,7 +121,7 @@ func getStatusCode(err error) int {
 	case errors.Is(err, models.ErrInvalidToken):
 		return http.StatusUnauthorized
 	case errors.Is(err, models.ErrWrongMoney) || errors.Is(err, models.ErrWrongCurrency) ||
-		errors.Is(err, models.ErrInsufficientFunds):
+		errors.Is(err, models.ErrInsufficientFunds) || errors.Is(err, models.ErrEmptyName):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
